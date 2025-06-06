@@ -1,0 +1,249 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: #121212;
+    color: #E0E0E0;
+    font-family: sans-serif;
+}
+
+#code-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* Behind other content */
+}
+
+.skyscope-app {
+    position: relative; /* Ensure it's a positioning context for z-index stacking if needed, and generally good practice */
+    z-index: 1; /* Ensure it's above the canvas */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    /* Ensure app content background is not fully transparent if you want it to obscure canvas in areas */
+    /* background-color: rgba(18, 18, 18, 0.95); /* Example: Slightly transparent main background */
+    gap: 1rem;
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.5); /* Adjusted for better visibility over animated background */
+    border-bottom: 1px solid #333;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+#holographic-globe-placeholder svg {
+    width: 4rem; /* 64px */
+    height: 4rem; /* 64px */
+}
+
+.app-title {
+    margin-left: 1rem;
+    font-size: 1.5rem; /* Equivalent to Tailwind's 2xl */
+}
+
+.main-workspace {
+    flex-grow: 1;
+    padding: 1rem;
+}
+
+.app-footer {
+    padding: 1rem;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5); /* Adjusted for better visibility over animated background */
+    border-top: 1px solid #333;
+}
+
+.developer-name {
+    font-size: 0.75rem; /* Equivalent to Tailwind's xs */
+    margin-bottom: 0.25rem;
+}
+
+.company-name {
+    font-size: 0.875rem; /* Equivalent to Tailwind's sm */
+    font-weight: bold;
+}
+
+/* SVG specific styles - if any needed beyond SVG attributes */
+/* For now, the SVG has its styles defined within its <defs> tag.
+   If specific classes were used within the SVG for styling, they could be targeted here.
+   The filter and gradient are part of the SVG's defs, which is standard.
+*/
+
+/* Ensure main content area is not completely transparent if it needs to obscure the canvas */
+.main-workspace {
+    display: flex; /* Already has flex-grow: 1 */
+    gap: 1rem;
+    /* background-color: rgba(18, 18, 18, 0.85); /* Example if needed - moved gap here */
+}
+
+.pane {
+    flex-grow: 1;
+    flex-basis: 0;
+    background-color: rgba(20, 20, 20, 0.6);
+    padding: 1rem;
+    border: 1px solid #2c2c2c;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pane h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: #00d2ff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+}
+
+.pane-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 4px;
+    min-height: 100px; /* For placeholder visibility */
+}
+
+/* Terminal Specific Styles */
+#terminal-content-area { /* Was .pane-content for terminal, now more specific */
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #0A0A0A; /* Darker than general pane */
+    padding: 10px;
+    font-family: 'monospace', monospace;
+    font-size: 0.9rem;
+    overflow: hidden; /* Prevent pane content from overflowing, terminal-output handles its own scroll */
+}
+
+#terminal-output.terminal-output-display { /* ID for JS, class for styling */
+    flex-grow: 1;
+    color: #E0E0E0; /* General output text color */
+    overflow-y: auto;
+    word-break: break-all; /* Break long words/strings */
+    white-space: pre-wrap; /* Preserve whitespace and wrap lines */
+    padding-right: 5px; /* Small padding for scrollbar */
+}
+
+.terminal-output-display p {
+    margin: 0 0 5px 0; /* Spacing between lines */
+    line-height: 1.2; /* Adjust for readability */
+}
+
+.terminal-command-line {
+    color: #00d2ff; /* Cyan for echoed commands, consistent with pane titles */
+}
+
+.terminal-output-line {
+    color: #E0E0E0; /* Standard output, same as general text */
+}
+
+.terminal-error-line {
+    color: #FF4136; /* A clear red for errors */
+}
+
+.terminal-input-line {
+    display: flex;
+    align-items: center;
+    margin-top: 5px; /* Space above input line */
+    background-color: #0A0A0A; /* Ensure it matches the terminal bg */
+}
+
+.terminal-prompt {
+    color: #00d2ff; /* Cyan prompt */
+    margin-right: 8px; /* Space after prompt */
+    white-space: nowrap; /* Prevent prompt from wrapping */
+}
+
+.terminal-input-field { /* Styling for the <input> element */
+    flex-grow: 1;
+    background-color: transparent;
+    border: none;
+    color: #E0E0E0; /* Input text color */
+    font-family: inherit; /* Inherit monospace from parent */
+    font-size: inherit; /* Inherit size from parent */
+    outline: none; /* No focus outline */
+    padding: 2px 0; /* Minimal padding */
+}
+
+/* Adjust general .pane-content if it was too specific before, or ensure it doesn't conflict */
+/* .pane-content might still be used by other panes like the browser-pane */
+/* If .terminal-output-placeholder class is no longer used, its styles can be removed or commented out */
+.terminal-output-placeholder {
+    /* display: none; or remove if not used */
+}
+.browser-view-placeholder {
+    /* display: none; or remove if not used */
+}
+
+/* Browser Pane Specific Styles */
+#browser-content-area { /* Was .pane-content or .browser-view-placeholder */
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ensure it fills the pane */
+    overflow: hidden; /* Contained within its bounds */
+    /* padding is inherited from .pane or .pane-content if class is kept */
+}
+
+.browser-controls {
+    display: flex;
+    padding: 8px 5px; /* More padding for controls */
+    gap: 8px; /* Slightly larger gap */
+    border-bottom: 1px solid #333;
+    background-color: rgba(10, 10, 10, 0.5); /* Slight background for control bar */
+}
+
+.url-input-field { /* Shared by URL and automation prompt */
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #444;
+    background-color: #1a1a1a; /* Dark input background */
+    color: #ddd; /* Light text */
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1.2; /* Ensure text is not too cramped */
+}
+
+.control-button { /* Shared by Go, Refresh, Run AI Task */
+    padding: 8px 15px; /* More padding for buttons */
+    background-color: #007bff; /* Standard blue */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap; /* Prevent button text from wrapping */
+}
+
+.control-button:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+}
+
+#browser-iframe.iframe-view { /* ID for JS, class for styling */
+    flex-grow: 1; /* Takes up available vertical space */
+    width: 100%;
+    border: none; /* No border around iframe */
+    background-color: #ffffff; /* Default background before page loads */
+}
+
+.browser-automation-controls {
+    display: flex;
+    padding: 8px 5px; /* Consistent with .browser-controls */
+    gap: 8px;
+    border-top: 1px solid #333;
+    margin-top: auto; /* Pushes this to the bottom of the flex container */
+    background-color: rgba(10, 10, 10, 0.5); /* Slight background for control bar */
+}
