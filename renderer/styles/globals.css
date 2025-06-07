@@ -1,0 +1,332 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: #121212;
+    color: #E0E0E0;
+    font-family: sans-serif;
+}
+
+/* This can be removed if CodeAnimatorComponent handles its own styling,
+   or if it's preferred globally for any canvas with this ID.
+   The component uses inline styles for position, z-index, width, height. */
+/* #code-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+} */
+
+.skyscope-app {
+    position: relative;
+    z-index: 1; /* Ensure it's above the fixed position canvas from CodeAnimatorComponent */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    gap: 1rem; /* This might be better on specific inner containers if header/footer shouldn't have this gap */
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-bottom: 1px solid #333;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+/* SVG styling is handled by HolographicGlobe.js component directly via props/style attribute */
+/* #holographic-globe-placeholder svg { ... } */
+
+.app-title {
+    margin-left: 1rem;
+    font-size: 1.5rem;
+}
+
+.main-workspace {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* Three equal columns */
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.app-footer {
+    padding: 1rem;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-top: 1px solid #333;
+}
+
+.developer-name {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.company-name {
+    font-size: 0.875rem;
+    font-weight: bold;
+}
+
+.pane {
+    flex-grow: 1;
+    /* flex-basis: 0; /* Not strictly needed with grid if columns are 1fr */
+    background-color: rgba(20, 20, 20, 0.6);
+    padding: 1rem;
+    border: 1px solid #2c2c2c;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Important for panes to manage their own scrolling content */
+}
+
+.pane h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: #00d2ff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 0.5rem;
+}
+
+.pane-content { /* General styling for content areas within panes */
+    flex-grow: 1;
+    /* overflow-y: auto; /* Often overridden by specific content areas like terminal-output */
+    background-color: rgba(0, 0, 0, 0.2); /* Slightly different bg for content part */
+    padding: 0.5rem;
+    border-radius: 4px;
+    min-height: 100px;
+    display: flex; /* Make pane-content a flex container by default */
+    flex-direction: column; /* Default to column for content stacking */
+}
+
+/* Terminal Specific Styles */
+#terminal-content-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #0A0A0A;
+    padding: 10px;
+    font-family: 'monospace', monospace;
+    font-size: 0.9rem;
+    overflow: hidden;
+}
+
+#terminal-output.terminal-output-display {
+    flex-grow: 1;
+    color: #E0E0E0;
+    overflow-y: auto;
+    word-break: break-all;
+    white-space: pre-wrap;
+    padding-right: 5px;
+}
+
+.terminal-output-display p {
+    margin: 0 0 5px 0;
+    line-height: 1.2;
+}
+
+.terminal-command-line { color: #00d2ff; }
+.terminal-output-line { color: #E0E0E0; }
+.terminal-error-line { color: #FF4136; }
+.terminal-info-line { color: #888888; font-style: italic; } /* For general info messages in terminal */
+
+.terminal-input-line {
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
+    background-color: #0A0A0A;
+}
+
+.terminal-prompt {
+    color: #00d2ff;
+    margin-right: 8px;
+    white-space: nowrap;
+}
+
+.terminal-input-field {
+    flex-grow: 1;
+    background-color: transparent;
+    border: none;
+    color: #E0E0E0;
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+    padding: 2px 0;
+}
+
+/* Browser Pane Specific Styles */
+#browser-content-area {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    padding: 0; /* Override .pane-content padding if direct child */
+}
+
+.browser-controls {
+    display: flex;
+    padding: 8px 5px;
+    gap: 8px;
+    border-bottom: 1px solid #333;
+    background-color: rgba(10, 10, 10, 0.5);
+}
+
+.url-input-field {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #444;
+    background-color: #1a1a1a;
+    color: #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+.control-button {
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.control-button:hover { background-color: #0056b3; }
+
+#browser-iframe.iframe-view {
+    flex-grow: 1;
+    width: 100%;
+    border: none;
+    background-color: #ffffff;
+}
+
+.browser-automation-controls {
+    display: flex;
+    padding: 8px 5px;
+    gap: 8px;
+    border-top: 1px solid #333;
+    margin-top: auto;
+    background-color: rgba(10, 10, 10, 0.5);
+}
+
+/* Agent Monitoring Pane Specific Styles */
+#agent-monitoring-content-area {
+    display: flex;
+    flex-direction: column;
+    /* padding: 0; /* Override .pane-content padding if direct child and sections handle their own */
+}
+
+.system-process-display {
+    font-size: 0.75rem;
+    color: #999;
+    margin-bottom: 10px;
+    padding: 8px;
+    background-color: rgba(0,0,0,0.25);
+    border-radius: 4px;
+    border: 1px solid #2c2c2c;
+}
+.system-process-display p { margin: 2px 0; }
+
+.agent-status-list {
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    padding: 5px;
+    background-color: rgba(0,0,0,0.15);
+    border-radius: 4px;
+    border: 1px solid #2a2a2a;
+}
+
+.agent-status-item {
+    padding: 6px 4px;
+    border-bottom: 1px solid #222;
+    line-height: 1.3;
+}
+.agent-status-item:last-child { border-bottom: none; }
+.agent-status-item small { color: #bbb; }
+
+.active-agent-progress-area {
+    font-size: 0.8rem;
+    padding-top: 5px;
+}
+.active-agent-progress-area p#active-agent-name {
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.progress-bar-container {
+    width: 100%;
+    background-color: #383838;
+    border-radius: 4px;
+    height: 22px;
+    overflow: hidden;
+    margin: 8px 0;
+    border: 1px solid #555;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: #00d2ff;
+    width: 0%;
+    transition: width 0.4s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-bar-percentage {
+    margin-left: 8px;
+    font-weight: bold;
+    color: #00d2ff;
+}
+
+.futuristic-squares-container {
+    margin-top: 8px;
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+}
+
+.fsquare {
+    width: 14px;
+    height: 14px;
+    background-color: #2d2d2d;
+    border: 1px solid #4a4a4a;
+    border-radius: 2px;
+    transition: background-color 0.3s ease;
+}
+.fsquare.active {
+    background-color: #00d2ff;
+    box-shadow: 0 0 5px #00d2ff, 0 0 10px #00d2ff;
+}
+
+.agent-activity-log-monitor-class {
+    flex-grow: 1;
+    background-color: #0A0A0A;
+    color: #C0C0C0;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: 'monospace', monospace;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-y: auto;
+    min-height: 100px;
+    border: 1px solid #2c2c2c;
+    margin-top: 10px;
+}
+
+/* Remove placeholder styles if no longer used */
+.terminal-output-placeholder, .browser-view-placeholder {
+    display: none;
+}

@@ -1,0 +1,51 @@
+{
+  "name": "skyscope-ai-electron-next",
+  "version": "0.1.0",
+  "description": "SKYSCOPE AI application with Electron and Next.js",
+  "main": "electron_main.js",
+  "author": "Miss Casey Jay Topojani <casey.topojani@example.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev:next": "next dev renderer -p 3000",
+    "build:next": "next build renderer && next export renderer -o dist/renderer",
+    "start:electron": "electron .",
+    "dev": "cross-env ELECTRON_START_URL=http://localhost:3000 concurrently \"npm:dev:next\" \"wait-on http://localhost:3000 && npm:start:electron\"",
+    "build:electron": "npm run build:next && electron-builder",
+    "build": "npm run build:electron"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@copilotkit/react-core": "^0.14.0",
+    "@copilotkit/react-ui": "^0.17.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0",
+    "electron-builder": "^24.9.1",
+    "cross-env": "^7.0.3"
+  },
+  "build": {
+    "appId": "com.skyscope.skyscopeai",
+    "productName": "SKYSCOPE AI",
+    "directories": {
+      "output": "release",
+      "app": "dist"
+    },
+    "files": [
+      "dist/renderer/**/*",
+      "electron_main.js"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
