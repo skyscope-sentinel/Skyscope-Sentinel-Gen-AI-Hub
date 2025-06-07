@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKYSCOPE AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="skyscope-app">
+        <header class="app-header">
+            <div class="logo-area">
+                <div id="holographic-globe-placeholder">
+                    <svg width="64" height="64" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="skyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#0A0A2A;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#1A1A5A;stop-opacity:1" />
+                            </linearGradient>
+                            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="4 4" result="blur"/>
+                                <feMerge>
+                                    <feMergeNode in="blur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <circle cx="128" cy="128" r="120" fill="url(#skyGradient)" opacity="0.7" filter="url(#glow)" />
+                        <path d="M30,128 Q98,60 226,128" stroke="rgba(173, 216, 230, 0.7)" stroke-width="2" fill="none" stroke-dasharray="5,5" />
+                        <path d="M30,128 Q98,196 226,128" stroke="rgba(173, 216, 230, 0.7)" stroke-width="2" fill="none" stroke-dasharray="5,5" />
+                        <path d="M128,30 Q60,98 128,226" stroke="rgba(173, 216, 230, 0.5)" stroke-width="2" fill="none" stroke-dasharray="5,5" />
+                        <path d="M128,30 Q196,98 128,226" stroke="rgba(173, 216, 230, 0.5)" stroke-width="2" fill="none" stroke-dasharray="5,5" />
+                        <circle cx="128" cy="128" r="100" stroke="rgba(135, 206, 250, 0.8)" stroke-width="2" fill="transparent" />
+                        <ellipse cx="128" cy="128" rx="100" ry="40" stroke="rgba(0,191,255,0.6)" stroke-width="2" fill="transparent" transform="rotate(0 128 128)" />
+                        <ellipse cx="128" cy="128" rx="100" ry="40" stroke="rgba(0,191,255,0.6)" stroke-width="2" fill="transparent" transform="rotate(60 128 128)" />
+                        <ellipse cx="128" cy="128" rx="100" ry="40" stroke="rgba(0,191,255,0.6)" stroke-width="2" fill="transparent" transform="rotate(120 128 128)" />
+                        <circle cx="128" cy="128" r="8" fill="rgba(255,255,255,0.9)" filter="url(#glow)" />
+                    </svg>
+                </div>
+                <h1 class="app-title">SKYSCOPE AI</h1>
+            </div>
+        </header>
+        <main class="main-workspace" id="main-workspace-grid"> <!-- Added ID for potential specific grid styling -->
+          <div class="pane terminal-pane" id="terminal-pane">
+            <h3>Terminal</h3>
+            <div class="pane-content" id="terminal-content-area">
+              <div id="terminal-output" class="terminal-output-display">
+                <p>SKYSCOPE AI Terminal [Version 0.1.0]</p>
+                <p>(c) Skyscope Sentinel Intelligence. Mock terminal.</p>
+                <p>Type 'help' for a list of mock commands.</p><br>
+              </div>
+              <div class="terminal-input-line">
+                <span class="terminal-prompt">&gt;</span>
+                <input type="text" id="terminal-input" class="terminal-input-field" autofocus />
+              </div>
+            </div>
+          </div>
+          <div class="pane browser-pane" id="browser-pane">
+            <h3>Browser</h3>
+            <div class="pane-content" id="browser-content-area">
+              <div class="browser-controls">
+                <input type="text" id="browser-url-input" class="url-input-field" placeholder="https://example.com">
+                <button id="browser-go-button" class="control-button">Go</button>
+                <button id="browser-refresh-button" class="control-button">Refresh</button>
+              </div>
+              <iframe id="browser-iframe" class="iframe-view" src="about:blank"></iframe>
+              <div class="browser-automation-controls">
+                <input type="text" id="browser-automation-prompt" class="url-input-field"
+                       placeholder="Automation: e.g., 'Summarize this page for me.'">
+                <button id="browser-automate-button" class="control-button">Run AI Task</button>
+              </div>
+            </div>
+          </div>
+          <div class="pane agent-monitoring-pane" id="agent-monitoring-pane">
+            <h3>Agent Activity & Monitoring</h3>
+            <div class="pane-content" id="agent-monitoring-content-area">
+              <div class="system-process-display" id="system-process-display">
+                <p>PROC: [Ollama: Idle] [GitHub: Idle] [BrowserCtrl: Idle]</p>
+                <p>SYS: [CPU: 15%] [Mem: 25%] [Net: 0KB/s]</p>
+              </div>
+              <hr>
+              <h4>Active Agents:</h4>
+              <div id="agent-status-list" class="agent-status-list">
+                <p>No agents active or registered.</p>
+              </div>
+              <hr>
+              <h4>Task Progress (Selected/Active Agent):</h4>
+              <div id="active-agent-progress-area" class="active-agent-progress-area">
+                <p id="active-agent-name">Agent: N/A</p>
+                <div class="progress-bar-container">
+                  <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <span id="progress-bar-percentage" class="progress-bar-percentage">0%</span>
+                <div id="futuristic-squares-container" class="futuristic-squares-container">
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                </div>
+              </div>
+              <hr>
+              <h4>Detailed Agent Activity Log:</h4>
+              <pre id="agent-activity-log-monitor" class="agent-activity-log-monitor-class"></pre>
+            </div>
+          </div>
+        </main>
+        <div class="ollama-test-area" style="padding: 1rem; margin-top: 1rem; background-color: #252525; border-radius: 8px; border: 1px solid #333;">
+          <h3>Ollama Integration Test</h3>
+          <input type="text" id="ollama-model-input" value="llama3" placeholder="Enter model name (e.g., llama3)" style="margin-right: 10px; padding: 5px;">
+          <input type="text" id="ollama-prompt-input" value="Why is the sky blue?" placeholder="Enter prompt" style="width: 300px; margin-right: 10px; padding: 5px;">
+          <button id="test-ollama-button" style="padding: 5px 10px;">Test Ollama</button>
+          <h4>Ollama Response:</h4>
+          <pre id="ollama-response-output" style="background-color: #111; padding: 0.5rem; border-radius: 4px; min-height: 50px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+        </div>
+        <div class="agent-framework-test-area" style="padding: 1rem; margin-top: 1rem; background-color: #252525; border-radius: 8px; border: 1px solid #333;">
+          <h3>Agent Framework Test</h3>
+          <button id="create-sample-agents-button">1. Create Sample Agents</button>
+          <div id="agent-creation-output" style="font-size:0.8em; margin-top:5px; min-height: 1.2em;"></div>
+          <hr style="margin:10px 0;">
+          <div>
+            Agent ID: <input type="text" id="agent-id-goal-input" placeholder="e.g., agent1" style="width:80px; padding:3px; font-size: 0.8em;">
+            Goal: <input type="text" id="agent-goal-input" placeholder="Enter goal for agent" style="width:300px; padding:3px; font-size: 0.8em;">
+            <button id="set-agent-goal-button">2. Set Goal & Add to Queue</button>
+          </div>
+          <div id="agent-goal-output" style="font-size:0.8em; margin-top:5px; min-height: 1.2em;"></div>
+          <hr style="margin:10px 0;">
+          <button id="run-agent-cycle-button">3. Run Agent Cycle</button>
+          <button id="stop-agent-cycle-button" style="margin-left: 10px;">Stop Cycle</button>
+          <h4>Agent Activity:</h4>
+          <pre id="agent-activity-output" style="background-color: #111; padding: 0.5rem; border-radius: 4px; min-height: 150px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em;"></pre>
+        </div>
+
+        <footer class="app-footer">
+            <p class="developer-name">Developer Miss Casey Jay Topojani</p>
+            <p class="company-name"><strong>Skyscope Sentinel Intelligence</strong></p>
+        </footer>
+    </div>
+    <canvas id="code-canvas"></canvas>
+    <script src="code_animator.js"></script>
+    <script src="js/ollama_integration.js"></script>
+    <script src="js/github_integration.js"></script>
+    <script src="js/huggingface_integration.js"></script>
+    <script src="js/google_api_integration.js"></script>
+    <script src="js/terminal_ui.js"></script>
+    <script src="js/browser_ui.js"></script>
+    <script src="js/agent_framework.js"></script>
+    <script src="js/agent_monitoring_ui.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        // Ollama Test Area
+        const ollamaButton = document.getElementById('test-ollama-button');
+        const ollamaModelInput = document.getElementById('ollama-model-input');
+        const ollamaPromptInput = document.getElementById('ollama-prompt-input');
+        if (ollamaButton) {
+          ollamaButton.addEventListener('click', () => {
+            const model = ollamaModelInput.value || 'llama3';
+            const prompt = ollamaPromptInput.value || 'Why is the sky blue?';
+            if (typeof queryOllamaModel === 'function') {
+              queryOllamaModel(model, prompt, 'ollama-response-output');
+            } else {
+              document.getElementById('ollama-response-output').innerText = 'Error: queryOllamaModel function not found. Check console.';
+            }
+          });
+        }
+
+        // GitHub Test Area
+        const githubPatInput = document.getElementById('github-pat-input');
+        const fetchReposButton = document.getElementById('fetch-repos-button');
+        const repoOwnerInput = document.getElementById('repo-owner-input');
+        const repoNameInput = document.getElementById('repo-name-input');
+        const repoPathInput = document.getElementById('repo-path-input');
+        const fetchFileButton = document.getElementById('fetch-file-button');
+        const githubResponseOutput = document.getElementById('github-response-output');
+
+        if (fetchReposButton) {
+          fetchReposButton.addEventListener('click', () => {
+            const pat = githubPatInput.value;
+            if (!pat) {
+              githubResponseOutput.innerText = 'GitHub Personal Access Token (PAT) is required.';
+              return;
+            }
+            if (typeof fetchUserRepositories === 'function') {
+              fetchUserRepositories(pat, 'github-response-output');
+            } else {
+              githubResponseOutput.innerText = 'Error: fetchUserRepositories function not found. Check console.';
+            }
+          });
+        }
+
+        if (fetchFileButton) {
+          fetchFileButton.addEventListener('click', () => {
+            const pat = githubPatInput.value; // PAT might be optional for public repos, handled by API function
+            const owner = repoOwnerInput.value;
+            const repo = repoNameInput.value;
+            const path = repoPathInput.value;
+
+            if (!owner || !repo || !path) {
+              githubResponseOutput.innerText = 'Repository owner, name, and file path are required.';
+              return;
+            }
+            if (typeof fetchRepoFileContent === 'function') {
+              fetchRepoFileContent(pat, owner, repo, path, 'github-response-output');
+            } else {
+              githubResponseOutput.innerText = 'Error: fetchRepoFileContent function not found. Check console.';
+            }
+          });
+        }
+
+        // Hugging Face Test Area
+        const hfTokenInput = document.getElementById('hf-token-input');
+        const hfSearchInput = document.getElementById('hf-search-input');
+        const hfListModelsButton = document.getElementById('hf-list-models-button');
+        const hfModelIdInput = document.getElementById('hf-model-id-input');
+        const hfModelInfoButton = document.getElementById('hf-model-info-button');
+        const hfResponseOutput = document.getElementById('hf-response-output');
+
+        if (hfListModelsButton) {
+          hfListModelsButton.addEventListener('click', () => {
+            const token = hfTokenInput.value || null;
+            const searchQuery = hfSearchInput.value;
+            if (typeof listModelsHuggingFace === 'function') {
+              listModelsHuggingFace(token, 'hf-response-output', searchQuery.trim());
+            } else {
+              hfResponseOutput.innerText = 'Error: listModelsHuggingFace function not found. Check console.';
+            }
+          });
+        }
+
+        if (hfModelInfoButton) {
+          hfModelInfoButton.addEventListener('click', () => {
+            const token = hfTokenInput.value || null;
+            const modelId = hfModelIdInput.value;
+            if (!modelId.trim()) {
+              hfResponseOutput.innerText = 'Model ID is required.';
+              return;
+            }
+            if (typeof getModelInfoHuggingFace === 'function') {
+              getModelInfoHuggingFace(modelId.trim(), token, 'hf-response-output');
+            } else {
+              hfResponseOutput.innerText = 'Error: getModelInfoHuggingFace function not found. Check console.';
+            }
+          });
+        }
+
+        // Google API Test Area
+        const googleApiKeyInput = document.getElementById('google-api-key-input');
+        const googleCxIdInput = document.getElementById('google-cx-id-input');
+        const googleQueryInput = document.getElementById('google-query-input');
+        const googleSearchButton = document.getElementById('google-search-button');
+        const googleSearchResponseOutput = document.getElementById('google-search-response-output');
+
+        if (googleSearchButton) {
+          googleSearchButton.addEventListener('click', () => {
+            const apiKey = googleApiKeyInput.value;
+            const cxId = googleCxIdInput.value;
+            const query = googleQueryInput.value;
+
+            if (typeof searchGoogle === 'function') {
+              searchGoogle(apiKey.trim(), cxId.trim(), query.trim(), 'google-search-response-output');
+            } else {
+              if(googleSearchResponseOutput) googleSearchResponseOutput.innerHTML = 'Error: searchGoogle function not found. Check console.';
+            }
+          });
+        }
+
+        // Agent Framework Test Area
+        const agentManager = AgentManager; // Get the singleton instance
+        initAgentMonitoring(agentManager); // Initialize Agent Monitoring UI
+
+        const createAgentsButton = document.getElementById('create-sample-agents-button');
+        const agentCreationOutput = document.getElementById('agent-creation-output');
+        const agentIdGoalInput = document.getElementById('agent-id-goal-input');
+        const agentGoalInput = document.getElementById('agent-goal-input');
+        const setAgentGoalButton = document.getElementById('set-agent-goal-button');
+        const agentGoalOutput = document.getElementById('agent-goal-output');
+        const runAgentCycleButton = document.getElementById('run-agent-cycle-button');
+        const stopAgentCycleButton = document.getElementById('stop-agent-cycle-button');
+        const agentActivityOutput = document.getElementById('agent-activity-output');
+        // Re-use ollamaModelInput from Ollama test area, already declared above
+        // const ollamaModelInput = document.getElementById('ollama-model-input');
+
+
+        if (createAgentsButton) {
+            createAgentsButton.addEventListener('click', () => {
+                try {
+                    const agent1 = new Agent('agent1', 'a helpful assistant specialized in creative writing and storytelling.');
+                    const agent2 = new Agent('agent2', 'a factual assistant specialized in explaining scientific concepts and historical events.');
+                    agentManager.registerAgent(agent1);
+                    agentManager.registerAgent(agent2);
+                    agentCreationOutput.textContent = "Agent 'agent1' (creative writing) and 'agent2' (factual science) registered.";
+                } catch (e) {
+                    agentCreationOutput.textContent = "Error creating agents: " + e.message;
+                    console.error(e);
+                }
+            });
+        }
+
+        if (setAgentGoalButton) {
+            setAgentGoalButton.addEventListener('click', () => {
+                const agentId = agentIdGoalInput.value.trim();
+                const goal = agentGoalInput.value.trim();
+                if (agentId && goal) {
+                    if (agentManager.getAgentById(agentId)) {
+                        agentManager.setAgentGoal(agentId, goal);
+                        agentGoalOutput.textContent = `Goal for agent '${agentId}' set: "${goal}". Agent added/updated in queue.`;
+                    } else {
+                        agentGoalOutput.textContent = `Agent '${agentId}' not found. Please create agents first.`;
+                    }
+                } else {
+                    agentGoalOutput.textContent = "Agent ID and Goal are required.";
+                }
+            });
+        }
+
+        if (runAgentCycleButton) {
+            runAgentCycleButton.addEventListener('click', () => {
+                const modelName = ollamaModelInput.value.trim() || 'llama3'; // Fallback to llama3
+                if (agentActivityOutput) agentActivityOutput.textContent = `Attempting to start agent cycle with model: ${modelName}...\n`; // Clear previous and set initial
+                agentManager.startAgentCycle(modelName, 'agent-activity-output');
+            });
+        }
+
+        if (stopAgentCycleButton) {
+            stopAgentCycleButton.addEventListener('click', () => {
+                 agentManager.stopAgentCycle();
+                 if (agentActivityOutput) agentActivityOutput.innerHTML += "Stop cycle requested by user.\n";
+            });
+        }
+
+      });
+    </script>
+</body>
+</html>
