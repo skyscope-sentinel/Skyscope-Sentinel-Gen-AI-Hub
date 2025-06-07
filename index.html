@@ -39,8 +39,10 @@
                 </div>
                 <h1 class="app-title">SKYSCOPE AI</h1>
             </div>
-        </header>
+      </header>
+        <main class="main-workspace" id="main-workspace-grid"> <!-- Added ID for potential specific grid styling -->
         <main class="main-workspace">
+main
           <div class="pane terminal-pane" id="terminal-pane">
             <h3>Terminal</h3>
             <div class="pane-content" id="terminal-content-area">
@@ -71,6 +73,39 @@
               </div>
             </div>
           </div>
+          <div class="pane agent-monitoring-pane" id="agent-monitoring-pane">
+            <h3>Agent Activity & Monitoring</h3>
+            <div class="pane-content" id="agent-monitoring-content-area">
+              <div class="system-process-display" id="system-process-display">
+                <p>PROC: [Ollama: Idle] [GitHub: Idle] [BrowserCtrl: Idle]</p>
+                <p>SYS: [CPU: 15%] [Mem: 25%] [Net: 0KB/s]</p>
+              </div>
+              <hr>
+              <h4>Active Agents:</h4>
+              <div id="agent-status-list" class="agent-status-list">
+                <p>No agents active or registered.</p>
+              </div>
+              <hr>
+              <h4>Task Progress (Selected/Active Agent):</h4>
+              <div id="active-agent-progress-area" class="active-agent-progress-area">
+                <p id="active-agent-name">Agent: N/A</p>
+                <div class="progress-bar-container">
+                  <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <span id="progress-bar-percentage" class="progress-bar-percentage">0%</span>
+                <div id="futuristic-squares-container" class="futuristic-squares-container">
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                  <span class="fsquare"></span><span class="fsquare"></span><span class="fsquare"></span>
+                </div>
+              </div>
+              <hr>
+              <h4>Detailed Agent Activity Log:</h4>
+              <pre id="agent-activity-log-monitor" class="agent-activity-log-monitor-class"></pre>
+            </div>
+          </div>
+=======
+ main
         </main>
         <div class="ollama-test-area" style="padding: 1rem; margin-top: 1rem; background-color: #252525; border-radius: 8px; border: 1px solid #333;">
           <h3>Ollama Integration Test</h3>
@@ -80,6 +115,26 @@
           <h4>Ollama Response:</h4>
           <pre id="ollama-response-output" style="background-color: #111; padding: 0.5rem; border-radius: 4px; min-height: 50px; white-space: pre-wrap; word-wrap: break-word;"></pre>
         </div>
+        <div class="agent-framework-test-area" style="padding: 1rem; margin-top: 1rem; background-color: #252525; border-radius: 8px; border: 1px solid #333;">
+          <h3>Agent Framework Test</h3>
+          <button id="create-sample-agents-button">1. Create Sample Agents</button>
+          <div id="agent-creation-output" style="font-size:0.8em; margin-top:5px; min-height: 1.2em;"></div>
+          <hr style="margin:10px 0;">
+          <div>
+            Agent ID: <input type="text" id="agent-id-goal-input" placeholder="e.g., agent1" style="width:80px; padding:3px; font-size: 0.8em;">
+            Goal: <input type="text" id="agent-goal-input" placeholder="Enter goal for agent" style="width:300px; padding:3px; font-size: 0.8em;">
+            <button id="set-agent-goal-button">2. Set Goal & Add to Queue</button>
+          </div>
+          <div id="agent-goal-output" style="font-size:0.8em; margin-top:5px; min-height: 1.2em;"></div>
+          <hr style="margin:10px 0;">
+          <button id="run-agent-cycle-button">3. Run Agent Cycle</button>
+          <button id="stop-agent-cycle-button" style="margin-left: 10px;">Stop Cycle</button>
+          <h4>Agent Activity:</h4>
+          <pre id="agent-activity-output" style="background-color: #111; padding: 0.5rem; border-radius: 4px; min-height: 150px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em;"></pre>
+        </div>
+
+=======
+ main
         <footer class="app-footer">
             <p class="developer-name">Developer Miss Casey Jay Topojani</p>
             <p class="company-name"><strong>Skyscope Sentinel Intelligence</strong></p>
@@ -93,6 +148,10 @@
     <script src="js/google_api_integration.js"></script>
     <script src="js/terminal_ui.js"></script>
     <script src="js/browser_ui.js"></script>
+    <script src="js/agent_framework.js"></script>
+    <script src="js/agent_monitoring_ui.js"></script>
+=======
+ main
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         // Ollama Test Area
@@ -210,6 +269,73 @@
             }
           });
         }
+
+        // Agent Framework Test Area
+        const agentManager = AgentManager; // Get the singleton instance
+        initAgentMonitoring(agentManager); // Initialize Agent Monitoring UI
+
+        const createAgentsButton = document.getElementById('create-sample-agents-button');
+        const agentCreationOutput = document.getElementById('agent-creation-output');
+        const agentIdGoalInput = document.getElementById('agent-id-goal-input');
+        const agentGoalInput = document.getElementById('agent-goal-input');
+        const setAgentGoalButton = document.getElementById('set-agent-goal-button');
+        const agentGoalOutput = document.getElementById('agent-goal-output');
+        const runAgentCycleButton = document.getElementById('run-agent-cycle-button');
+        const stopAgentCycleButton = document.getElementById('stop-agent-cycle-button');
+        const agentActivityOutput = document.getElementById('agent-activity-output');
+        // Re-use ollamaModelInput from Ollama test area, already declared above
+        // const ollamaModelInput = document.getElementById('ollama-model-input');
+
+
+        if (createAgentsButton) {
+            createAgentsButton.addEventListener('click', () => {
+                try {
+                    const agent1 = new Agent('agent1', 'a helpful assistant specialized in creative writing and storytelling.');
+                    const agent2 = new Agent('agent2', 'a factual assistant specialized in explaining scientific concepts and historical events.');
+                    agentManager.registerAgent(agent1);
+                    agentManager.registerAgent(agent2);
+                    agentCreationOutput.textContent = "Agent 'agent1' (creative writing) and 'agent2' (factual science) registered.";
+                } catch (e) {
+                    agentCreationOutput.textContent = "Error creating agents: " + e.message;
+                    console.error(e);
+                }
+            });
+        }
+
+        if (setAgentGoalButton) {
+            setAgentGoalButton.addEventListener('click', () => {
+                const agentId = agentIdGoalInput.value.trim();
+                const goal = agentGoalInput.value.trim();
+                if (agentId && goal) {
+                    if (agentManager.getAgentById(agentId)) {
+                        agentManager.setAgentGoal(agentId, goal);
+                        agentGoalOutput.textContent = `Goal for agent '${agentId}' set: "${goal}". Agent added/updated in queue.`;
+                    } else {
+                        agentGoalOutput.textContent = `Agent '${agentId}' not found. Please create agents first.`;
+                    }
+                } else {
+                    agentGoalOutput.textContent = "Agent ID and Goal are required.";
+                }
+            });
+        }
+
+        if (runAgentCycleButton) {
+            runAgentCycleButton.addEventListener('click', () => {
+                const modelName = ollamaModelInput.value.trim() || 'llama3'; // Fallback to llama3
+                if (agentActivityOutput) agentActivityOutput.textContent = `Attempting to start agent cycle with model: ${modelName}...\n`; // Clear previous and set initial
+                agentManager.startAgentCycle(modelName, 'agent-activity-output');
+            });
+        }
+
+        if (stopAgentCycleButton) {
+            stopAgentCycleButton.addEventListener('click', () => {
+                 agentManager.stopAgentCycle();
+                 if (agentActivityOutput) agentActivityOutput.innerHTML += "Stop cycle requested by user.\n";
+            });
+        }
+
+=======
+ main
       });
     </script>
 </body>
