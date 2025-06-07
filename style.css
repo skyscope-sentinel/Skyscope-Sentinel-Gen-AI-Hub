@@ -89,6 +89,11 @@ body, html {
     gap: 1rem;
     padding: 1rem; /* Add padding to main-workspace if not already there from .skyscope-app */
     /* background-color: rgba(18, 18, 18, 0.85); */
+=======
+    display: flex; /* Already has flex-grow: 1 */
+    gap: 1rem;
+    /* background-color: rgba(18, 18, 18, 0.85); /* Example if needed - moved gap here */
+ main
 }
 
 .pane {
@@ -326,6 +331,8 @@ body, html {
     margin-top: 10px; /* Space from hr */
 }
 
+=======
+ main
 .url-input-field { /* Shared by URL and automation prompt */
     flex-grow: 1;
     padding: 8px;
