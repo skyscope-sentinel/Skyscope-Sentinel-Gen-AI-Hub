@@ -1,0 +1,68 @@
+{
+  "name": "skyscope-ai",
+  "version": "0.1.0",
+  "description": "SKYSCOPE AI - Advanced AI Application",
+  "main": "electron_main.js",
+  "type": "commonjs",
+  "author": "Miss Casey Jay Topojani (Skyscope Sentinel Intelligence)",
+  "license": "MIT",
+  "scripts": {
+    "dev:next": "next dev renderer -p 3000",
+    "build:next": "next build renderer && next export renderer -o dist/renderer",
+    "start:electron": "electron .",
+    "dev": "cross-env ELECTRON_START_URL=http://localhost:3000 concurrently \"npm:dev:next\" \"wait-on http://localhost:3000 && npm:start:electron\"",
+    "build:electron": "npm run build:next && electron-builder",
+    "build": "npm run build:electron"
+  },
+  "dependencies": {
+    "@copilotkit/react-core": "^0.30.0",
+    "@copilotkit/react-ui": "^0.30.0",
+    "electron": "^28.2.0",
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.caseyjaytopojani.skyscopeai",
+    "productName": "SKYSCOPE AI",
+    "copyright": "Copyright © 2024 Miss Casey Jay Topojani",
+    "directories": {
+      "output": "dist_electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron_main.js",
+      "preload.js",
+      "dist/renderer/**/*",
+      "node_modules/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Advanced AI assistant and automation tool.",
+      "description": "SKYSCOPE AI is a comprehensive platform leveraging local and remote AI models for various tasks including chat, terminal operations, browser automation, API interactions, and agentic workflows.",
+      "maintainer": "Miss Casey Jay Topojani <admin@skyscopeglobal.net>"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "asar": true
+  }
+}
