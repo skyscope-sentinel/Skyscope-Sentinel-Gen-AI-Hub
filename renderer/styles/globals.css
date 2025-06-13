@@ -1,0 +1,374 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: #0D0D0D; /* Very dark base */
+    color: #E0E0E0;
+    font-family: sans-serif;
+}
+
+/* CodeAnimatorComponent canvas is styled inline for position/z-index */
+
+.skyscope-app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    /* For acrylic effect on the main app body, if not full window transparent */
+    background-color: rgba(18, 18, 22, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    /* border-radius: 10px; /* Only if app is not maximized/fullscreen */
+    overflow: hidden; /* Needed if using border-radius on the app container */
+}
+
+.app-header, .app-footer {
+    padding: 1rem;
+    background-color: rgba(30, 30, 40, 0.65);
+    backdrop-filter: blur(12px) saturate(150%);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    /* Ensure text is readable */
+    color: #E0E0E0;
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-footer {
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+}
+
+.app-title {
+    margin-left: 1rem;
+    font-size: 1.5rem;
+    color: #E0E0E0; /* Ensure title is bright */
+}
+
+.main-workspace {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.developer-name {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.company-name {
+    font-size: 0.875rem;
+    font-weight: bold;
+}
+
+.pane {
+    flex-grow: 1;
+    background-color: rgba(35, 35, 45, 0.55);
+    backdrop-filter: blur(10px) saturate(130%);
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px; /* Panes should have rounded corners */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+}
+
+.pane h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: #90cfee; /* Lighter, more ethereal blue */
+    text-shadow: 0 0 5px rgba(144, 207, 238, 0.5);
+    border-bottom: 1px solid rgba(144, 207, 238, 0.2); /* Match title color with alpha */
+    padding-bottom: 0.5rem;
+}
+
+.pane-content {
+    flex-grow: 1;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 4px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Let specific children handle their scroll */
+}
+
+/* Terminal Specific Styles - Adjusting for Acrylic */
+#terminal-content-area {
+    background-color: transparent; /* Let pane background show through */
+    padding: 10px;
+    font-family: 'monospace', monospace;
+    font-size: 0.9rem;
+}
+
+#terminal-output.terminal-output-display {
+    color: #E0E0E0;
+    background-color: rgba(10,10,20,0.3); /* Slightly darker, translucent scroll area */
+    backdrop-filter: blur(2px);
+    border-radius: 3px;
+    padding: 5px;
+}
+
+.terminal-input-line {
+    background-color: transparent;
+}
+
+.terminal-input-field {
+    background-color: rgba(20, 20, 30, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    backdrop-filter: blur(3px);
+    padding: 5px; /* Added padding */
+    border-radius: 3px; /* Added radius */
+}
+
+/* Browser Pane Specific Styles - Adjusting for Acrylic */
+#browser-content-area {
+    background-color: transparent; /* Let pane background show */
+    padding: 0;
+}
+
+.browser-controls {
+    padding: 8px 5px;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(25, 25, 35, 0.4); /* Control bar acrylic */
+    backdrop-filter: blur(5px);
+}
+
+.url-input-field,
+input[type="text"],
+input[type="password"] { /* General input styling for test areas too */
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(20, 20, 30, 0.7);
+    color: #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    backdrop-filter: blur(3px);
+}
+/* Specific input placeholder styling if needed */
+input::placeholder { color: #888; }
+
+
+.control-button,
+button { /* General button styling for test areas too */
+    padding: 8px 15px;
+    background-color: rgba(0, 123, 255, 0.5);
+    color: white;
+    border: 1px solid rgba(0, 123, 255, 0.8);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.control-button:hover,
+button:hover {
+    background-color: rgba(0, 100, 220, 0.7);
+}
+
+#browser-iframe.iframe-view {
+    background-color: #ffffff; /* Keep iframe content opaque unless site itself is transparent */
+}
+
+.browser-automation-controls {
+    background-color: rgba(25, 25, 35, 0.4); /* Control bar acrylic */
+    backdrop-filter: blur(5px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Agent Monitoring Pane Specific Styles - Adjusting for Acrylic */
+#agent-monitoring-content-area {
+    background-color: transparent; /* Let pane background show */
+}
+
+.system-process-display {
+    padding: 8px;
+    background-color: rgba(10,10,20,0.4);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+}
+
+.agent-status-list {
+    padding: 5px;
+    background-color: rgba(10,10,20,0.3);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+}
+.agent-status-item {
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.progress-bar-container {
+    background-color: rgba(50, 50, 60, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill {
+    background-color: #00a0cc; /* Slightly less neon than pure #00d2ff for fill */
+    box-shadow: 0 0 8px rgba(0, 160, 204, 0.7); /* Glow for progress fill */
+}
+
+.fsquare.active {
+    background-color: #00a0cc;
+    box-shadow: 0 0 5px #00a0cc, 0 0 10px #00a0cc;
+}
+
+.agent-activity-log-monitor-class,
+#agent-activity-output, /* Style existing test area pre tags */
+pre[id$="-response-output"] /* Style all API test area pre tags */
+{
+    background-color: rgba(5,5,10,0.5) !important; /* Darker, more translucent for logs */
+    backdrop-filter: blur(5px);
+    color: #C0C0C0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-y: auto;
+    min-height: 100px;
+    margin-top: 10px;
+}
+
+
+.action-log-display {
+    background-color: rgba(15,15,25,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(2px);
+}
+.action-log-display p { border-bottom: 1px dotted rgba(255, 255, 255, 0.15); }
+
+
+/* Basic Webkit Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(20, 20, 30, 0.5); /* Translucent track */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(60, 60, 80, 0.7); /* Translucent thumb */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(80, 80, 100, 0.9);
+}
+
+/* Remove placeholder styles if no longer used */
+.terminal-output-placeholder, .browser-view-placeholder {
+    display: none;
+}
+
+/* CopilotKit Popup Styling - Speculative */
+/* TODO: Investigate deeper customization for CopilotPopup to match acrylic theme.
+   Default styles are imported in _app.js. Overrides might be needed.
+   The class names below are common patterns but might not match CopilotKit's actual structure.
+   Use browser dev tools to inspect actual class names.
+*/
+.copilotKitPopupContainer > div, /* Example if container has an immediate child div */
+.copilot-kit-popup > div { /* Example if this is the main popup class */
+    background-color: rgba(30, 30, 40, 0.85) !important; /* More translucent */
+    backdrop-filter: blur(10px) saturate(150%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+    border-radius: 10px !important; /* Ensure it has rounded corners */
+}
+
+/* Adjust text colors and input fields within the popup if needed for contrast */
+.copilotKitPopupContainer textarea,
+.copilotKitPopupContainer input, /* Assuming input fields exist */
+.copilot-kit-popup textarea,
+.copilot-kit-popup input {
+    background-color: rgba(20, 20, 30, 0.7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #e0e0e0 !important;
+    backdrop-filter: blur(3px) !important;
+}
+
+.copilotKitPopupContainer button,
+.copilot-kit-popup button {
+    background-color: rgba(0, 123, 255, 0.5) !important;
+    border: 1px solid rgba(0, 123, 255, 0.8) !important;
+    color: white !important;
+    backdrop-filter: blur(5px) !important;
+}
+.copilotKitPopupContainer button:hover,
+.copilot-kit-popup button:hover {
+    background-color: rgba(0, 100, 220, 0.7) !important;
+}
+
+/* Ensure other elements like headers/messages within popup have good contrast */
+.copilotKitPopupContainer [class*="header"], /* Generic targeting */
+.copilotKitPopupContainer [class*="message"],
+.copilot-kit-popup [class*="header"],
+.copilot-kit-popup [class*="message"] {
+    color: #e0e0e0 !important; /* Example, adjust as needed */
+}
+
+/* Styles for Agent Monitoring Pane UI Enhancements specific classes */
+.active-agent-highlight {
+    background-color: rgba(42, 42, 74, 0.7) !important; /* More translucent acrylic */
+    border-left: 3px solid #00d2ff;
+    backdrop-filter: blur(3px); /* Subtle blur on highlight */
+}
+
+.status-idle { color: #ccc; }
+.status-active { color: #00d2ff; font-weight: bold; }
+.status-completed_goal { color: #28a745; }
+.status-error { color: #dc3545; }
+
+/* Action log display specific styles */
+.action-log-display {
+    font-size: 0.75rem;
+    max-height: 120px;
+    overflow-y: auto;
+    background-color: rgba(10,10,20,0.4); /* Darker acrylic for logs */
+    border-radius: 3px;
+    padding: 8px;
+    margin-top: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    backdrop-filter: blur(2px);
+}
+
+.action-log-display p {
+    margin: 3px 0;
+    border-bottom: 1px dotted rgba(255, 255, 255, 0.15);
+    padding-bottom: 3px;
+    line-height: 1.3;
+}
+.action-log-display p:last-child { border-bottom: none; }
+.action-log-display em { color: #888; margin-right: 5px; }
+
+.log-status-info { color: #abb2bf; }
+.log-status-success { color: #98c379; }
+.log-status-error { color: #e06c75; }
+
+.agent-activity-log-monitor-class { /* Ensure this is distinct or remove if merged with general pre styling */
+    height: 150px;
+}
