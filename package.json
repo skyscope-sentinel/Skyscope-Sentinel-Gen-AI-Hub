@@ -1,9 +1,10 @@
 {
-  "name": "skyscope-ai-electron-next",
+  "name": "skyscope-ai",
   "version": "0.1.0",
-  "description": "SKYSCOPE AI application with Electron and Next.js",
+  "description": "SKYSCOPE AI - Advanced AI Application",
   "main": "electron_main.js",
-  "author": "Miss Casey Jay Topojani <casey.topojani@example.com>",
+  "type": "commonjs",
+  "author": "Miss Casey Jay Topojani (Skyscope Sentinel Intelligence)",
   "license": "MIT",
   "scripts": {
     "dev:next": "next dev renderer -p 3000",
@@ -14,38 +15,54 @@
     "build": "npm run build:electron"
   },
   "dependencies": {
-    "electron": "^28.0.0",
-    "next": "^14.0.0",
+    "@copilotkit/react-core": "^0.30.0",
+    "@copilotkit/react-ui": "^0.30.0",
+    "electron": "^28.2.0",
+    "next": "^14.1.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@copilotkit/react-core": "^0.14.0",
-    "@copilotkit/react-ui": "^0.17.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
+    "cross-env": "^7.0.3",
     "electron-builder": "^24.9.1",
-    "cross-env": "^7.0.3"
+    "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.skyscope.skyscopeai",
+    "appId": "com.caseyjaytopojani.skyscopeai",
     "productName": "SKYSCOPE AI",
+    "copyright": "Copyright © 2024 Miss Casey Jay Topojani",
     "directories": {
-      "output": "release",
-      "app": "dist"
+      "output": "dist_electron",
+      "buildResources": "build"
     },
     "files": [
+      "electron_main.js",
+      "preload.js",
       "dist/renderer/**/*",
-      "electron_main.js"
+      "node_modules/**/*"
     ],
-    "mac": {
-      "target": "dmg"
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Advanced AI assistant and automation tool.",
+      "description": "SKYSCOPE AI is a comprehensive platform leveraging local and remote AI models for various tasks including chat, terminal operations, browser automation, API interactions, and agentic workflows.",
+      "maintainer": "Miss Casey Jay Topojani <admin@skyscopeglobal.net>"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
-    "linux": {
-      "target": "AppImage"
-    }
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "asar": true
   }
 }

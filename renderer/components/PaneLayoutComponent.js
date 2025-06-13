@@ -1,15 +1,15 @@
 // renderer/components/PaneLayoutComponent.js
 import React from 'react';
 import TerminalPaneComponent from './TerminalPaneComponent';
-import BrowserPaneComponent from './BrowserPaneComponent'; // Import
+import BrowserPaneComponent from './BrowserPaneComponent';
+import AgentMonitoringPaneComponent from './AgentMonitoringPaneComponent'; // Import
 
-const AgentMonitoringPanePlaceholder = () => <div className="pane agent-monitoring-pane" id="agent-monitoring-pane"><h3>Agent Monitoring</h3><div className="pane-content" id="agent-monitoring-content-area"><p>Agent Monitoring UI will load here...</p></div></div>;
-
-const PaneLayoutComponent = () => (
+// Pass agentManagerInstance as a prop
+const PaneLayoutComponent = ({ agentManagerInstance }) => (
   <main className="main-workspace" id="main-workspace-grid">
     <TerminalPaneComponent />
-    <BrowserPaneComponent /> {/* Use actual component */}
-    <AgentMonitoringPanePlaceholder />
+    <BrowserPaneComponent />
+    <AgentMonitoringPaneComponent agentManagerInstance={agentManagerInstance} /> {/* Use & pass prop */}
   </main>
 );
 export default PaneLayoutComponent;

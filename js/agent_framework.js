@@ -9,6 +9,15 @@ class Agent {
         this.state = "idle"; // "idle", "active", "completed_goal", "error"
         this.microTaskProgress = 0;
         this.currentMicroTaskName = "Awaiting goal...";
+        this.actionLog = []; // Initialize action log
+    }
+
+    logAction(actionDescription, status = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      this.actionLog.push({ timestamp, description: actionDescription, status });
+      if (this.actionLog.length > 10) { // Keep log concise
+        this.actionLog.shift();
+      }
     }
 
     setGoal(goal) {
@@ -17,6 +26,7 @@ class Agent {
         this.state = "idle"; // Ready to be picked up
         this.microTaskProgress = 0;
         this.currentMicroTaskName = "Goal received, pending activation.";
+        this.logAction(`New goal set: "${goal}"`, 'info');
         console.log(`Agent [${this.id}] goal set: ${goal}`);
     }
 
@@ -56,23 +66,20 @@ const AgentManager = (function() {
     let ollamaIsCurrentlyBusy = false; // New flag for Ollama status
 
     function _displayAgentActivity(agent, message) {
-        // This function's primary output might shift to the new monitoring pane.
-        // For now, it will still log to console and potentially the old output element if set.
-        const activityLogTarget = document.getElementById('agent-activity-log-monitor'); // New specific log area in monitor pane
-        if (activityLogTarget) {
-             const timestamp = new Date().toLocaleTimeString();
-             activityLogTarget.innerHTML += `${timestamp} - Agent [${agent.id}]: ${message}\n`;
-             activityLogTarget.scrollTop = activityLogTarget.scrollHeight;
-        } else if (cycleOutputElementId) { // Fallback to old system if new one not ready
-            const outputElement = document.getElementById(cycleOutputElementId);
-            if (outputElement) {
-                const timestamp = new Date().toLocaleTimeString();
-                outputElement.innerHTML += `${timestamp} - Agent [${agent.id}]: ${message}\n`;
-                outputElement.scrollTop = outputElement.scrollHeight;
-            }
+        const logEntry = agent ? `[${new Date().toLocaleTimeString()}] Agent[${agent.id}]: ${message}\n` : `[${new Date().toLocaleTimeString()}] System: ${message}\n`;
+        console.log(logEntry.trim()); // Keep console log
+        const monitorLogElement = document.getElementById('agent-activity-log-monitor');
+        if (monitorLogElement) {
+          monitorLogElement.textContent += logEntry; // Use textContent for <pre> to preserve formatting
+          monitorLogElement.scrollTop = monitorLogElement.scrollHeight;
+        } else if (cycleOutputElementId) { // Fallback to old way if new element not found
+           const outputElement = document.getElementById(cycleOutputElementId);
+           if (outputElement) {
+               outputElement.textContent += logEntry;
+               outputElement.scrollTop = outputElement.scrollHeight;
+           }
         }
-        console.log(`Agent [${agent.id}]: ${message}`);
-    }
+      }
 
     async function runAgentTurn(agentId) {
         if (!agents[agentId]) {
@@ -81,20 +88,24 @@ const AgentManager = (function() {
         }
         const agent = agents[agentId];
 
+        agent.logAction(`Turn started for goal: ${agent.currentGoal}`, 'info');
+        agent.microTaskProgress = 10;
+
         if(agent.state === "completed_goal") {
             _displayAgentActivity(agent, `Already completed goal: ${agent.currentGoal}`);
             agent.microTaskProgress = 100;
             agent.currentMicroTaskName = "Goal previously completed.";
+            agent.logAction('Skipped turn: Goal previously completed.', 'info');
             return agent;
         }
 
         agent.setState("active");
-        agent.microTaskProgress = 10; // Initial progress for starting a turn
         agent.currentMicroTaskName = "Generating context prompt...";
         _displayAgentActivity(agent, `Thinking... Goal: ${agent.currentGoal}`);
 
         const prompt = agent.getContextPrompt();
         agent.currentMicroTaskName = `Querying LLM (${ollamaModelForCycle})...`;
+        agent.logAction(`Preparing prompt and querying LLM (${ollamaModelForCycle})`, 'info');
         agent.microTaskProgress = 30;
 
         try {
@@ -105,7 +116,7 @@ const AgentManager = (function() {
                 body: JSON.stringify({ model: ollamaModelForCycle, prompt: prompt, stream: false })
             });
             ollamaIsCurrentlyBusy = false;
-            agent.microTaskProgress = 70; // Response received
+            agent.microTaskProgress = 70;
 
             if (!ollamaResponse.ok) {
                 const errorText = await ollamaResponse.text();
@@ -114,7 +125,8 @@ const AgentManager = (function() {
 
             const responseData = await ollamaResponse.json();
             const actualResponse = responseData.response.trim();
-            agent.currentMicroTaskName = "Processing LLM response...";
+            agent.currentMicroTaskName = "Processing LLM response";
+            agent.logAction(`Received LLM response (${actualResponse.length} chars)`, 'info');
 
             agent.addInteractionToMemory(`Goal: ${agent.currentGoal}`, actualResponse);
             _displayAgentActivity(agent, `Response: ${actualResponse}`);
@@ -122,20 +134,23 @@ const AgentManager = (function() {
             if (actualResponse.startsWith("Goal Complete:")) {
                 agent.setState("completed_goal");
                 agent.microTaskProgress = 100;
-                agent.currentMicroTaskName = "Goal requirements met.";
+                agent.currentMicroTaskName = "Goal Completed";
+                agent.logAction(`Goal '${agent.currentGoal}' marked complete.`, 'success');
                 _displayAgentActivity(agent, `Goal marked as complete.`);
             } else {
-                agent.setState("idle"); // Ready for another turn if needed
-                agent.microTaskProgress = 100; // Turn complete, but goal not.
+                agent.setState("idle");
+                agent.microTaskProgress = 100;
                 agent.currentMicroTaskName = "Awaiting next cycle for continuation.";
+                agent.logAction('Turn finished, goal not yet complete.', 'info');
             }
         } catch (error) {
             ollamaIsCurrentlyBusy = false;
             console.error(`Error in runAgentTurn for ${agentId}:`, error);
             _displayAgentActivity(agent, `Error: ${error.message}`);
             agent.setState("error");
-            agent.microTaskProgress = 0; // Or some error indication
-            agent.currentMicroTaskName = `Error occurred: ${error.message.substring(0,30)}...`;
+            agent.microTaskProgress = 0;
+            agent.currentMicroTaskName = `Error encountered`;
+            agent.logAction(`Error: ${error.message}`, 'error');
         }
         return agent;
     }

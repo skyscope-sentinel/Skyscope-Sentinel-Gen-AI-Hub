@@ -1,19 +1,21 @@
 // renderer/pages/index.js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import HeaderComponent from '../components/HeaderComponent';
 import FooterComponent from '../components/FooterComponent';
 import CodeAnimatorComponent from '../components/CodeAnimatorComponent';
 import PaneLayoutComponent from '../components/PaneLayoutComponent';
 import { CopilotPopup } from '@copilotkit/react-ui';
-import { useCopilotAction } from '@copilotkit/react-core'; // Should already be there
+import { useCopilotAction } from '@copilotkit/react-core';
 
 export default function HomePage() {
+  const [agentManager] = useState(() => AgentManager());
+
   // Define CopilotKit frontend actions
   useCopilotAction({
     name: "getTime",
     description: "Get the current date and time.",
-    parameters: [], // No parameters for this action
+    parameters: [],
     handler: async () => {
       const currentTime = new Date().toLocaleString();
       console.log("Action: getTime called, returning:", currentTime);
@@ -25,16 +27,11 @@ export default function HomePage() {
     name: "showSimpleAlert",
     description: "Display a simple alert message to the user in the application.",
     parameters: [
-      {
-        name: "message",
-        type: "string",
-        description: "The message to display in the alert.",
-        required: true
-      },
+      { name: "message", type: "string", description: "The message to display in the alert.", required: true },
     ],
     handler: async ({ message }) => {
       console.log("Action: showSimpleAlert called with message:", message);
-      alert(`Message from SKYSCOPE AI: ${message}`); // Standard browser alert
+      alert(`Message from SKYSCOPE AI: ${message}`);
       return "Alert has been displayed to the user.";
     },
   });
@@ -44,8 +41,7 @@ export default function HomePage() {
     description: "Get a list of currently active/visible UI panes in the SKYSCOPE AI application. For now, this is a mock.",
     parameters: [],
     handler: async () => {
-      // In a real app, this would check the actual state of UI panes.
-      const mockActivePanes = ["Terminal", "Browser", "Agent Monitoring"];
+      const mockActivePanes = ["Terminal", "Morphic AI Search Engine", "Agent Monitoring"];
       console.log("Action: getActivePanes called, returning mock data:", mockActivePanes);
       return JSON.stringify(mockActivePanes);
     },
@@ -53,62 +49,41 @@ export default function HomePage() {
 
   useCopilotAction({
     name: "executeTerminalCommand",
-    description: "Executes a shell command on the local machine where SKYSCOPE AI is running and returns its output. Use with caution as this can modify the system. List files with 'ls', show directory with 'pwd', etc.",
+    description: "Executes a shell command on the local machine where SKYSCOPE AI is running and returns its output. Use with caution as this can modify the system.",
     parameters: [
-      {
-        name: "command",
-        type: "string",
-        description: "The shell command to execute (e.g., 'ls -la', 'echo hello').",
-        required: true
-      },
+      { name: "command", type: "string", description: "The shell command to execute (e.g., 'ls -la', 'echo hello').", required: true },
     ],
     handler: async ({ command }) => {
       console.log("CopilotAction: executeTerminalCommand called with command:", command);
+      if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(command, 'command');
+      else console.warn("window.skyscopeTerminal.appendToOutput not found.");
 
-      if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function') {
-        window.skyscopeTerminal.appendToOutput(command, 'command');
-      } else {
-        console.warn("window.skyscopeTerminal.appendToOutput not found. Terminal UI might not update with command echo.");
-      }
-
-      if (window.electronIPC && typeof window.electronIPC.invoke === 'function') {
+      if (window.electronIPC?.invoke) {
         try {
           const result = await window.electronIPC.invoke('execute-command', command);
           let outputString = "";
           if (result.stdout) {
             outputString += `STDOUT:\n${result.stdout}\n`;
-            if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function') {
-              window.skyscopeTerminal.appendToOutput(result.stdout, 'output');
-            }
+            if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(result.stdout, 'output');
           }
           if (result.stderr) {
             outputString += `STDERR:\n${result.stderr}\n`;
-            if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function') {
-              window.skyscopeTerminal.appendToOutput(result.stderr, 'error');
-            }
+            if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(result.stderr, 'error');
           }
-          if (result.error) {
+          if (result.error && !result.stderr) {
              outputString += `EXEC_ERROR: ${result.error}\n (Code: ${result.code})`;
-             if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function' && !result.stderr) {
-               window.skyscopeTerminal.appendToOutput(`Error: ${result.error} (Code: ${result.code})`, 'error');
-            }
+             if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(`Error: ${result.error} (Code: ${result.code})`, 'error');
           }
-          if (outputString.trim() === "") outputString = "Command executed with no output.";
-
-          return outputString.trim();
+          return outputString.trim() || "Command executed with no output.";
         } catch (e) {
           console.error("Error invoking 'execute-command' via IPC:", e);
-          if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function') {
-            window.skyscopeTerminal.appendToOutput(`IPC Error: ${e.message}`, 'error');
-          }
+          if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(`IPC Error: ${e.message}`, 'error');
           return `Error executing command: ${e.message}`;
         }
       } else {
-        const errMsg = "Electron IPC bridge ('window.electronIPC.invoke') is not available. Cannot execute terminal command.";
+        const errMsg = "Electron IPC bridge not available.";
         console.error(errMsg);
-        if (window.skyscopeTerminal && typeof window.skyscopeTerminal.appendToOutput === 'function') {
-          window.skyscopeTerminal.appendToOutput(errMsg, 'error');
-        }
+        if (window.skyscopeTerminal?.appendToOutput) window.skyscopeTerminal.appendToOutput(errMsg, 'error');
         return errMsg;
       }
     },
@@ -116,44 +91,35 @@ export default function HomePage() {
 
   useCopilotAction({
     name: "navigateToUrl",
-    description: "Navigates the application's integrated browser pane to a specified URL. The AI also performs this navigation in a headless browser for its own context.",
+    description: "Navigates the application's integrated browser/Morphic pane to a specified URL.",
     parameters: [{ name: "url", type: "string", description: "The URL to navigate to (e.g., 'https://example.com').", required: true }],
     handler: async ({ url }) => {
       console.log("Action: navigateToUrl called with URL:", url);
-      if (window.skyscopeBrowser && typeof window.skyscopeBrowser.loadUrl === 'function') {
-        window.skyscopeBrowser.loadUrl(url); // Update visible iframe
+      if (window.skyscopeBrowser?.loadUrl) {
+        window.skyscopeBrowser.loadUrl(url);
+        return `Navigation to ${url} initiated in the browser/Morphic pane.`;
       } else {
-        console.warn("window.skyscopeBrowser.loadUrl not found. UI Iframe might not update.");
-      }
-      try {
-        const response = await fetch('http://localhost:3001/api/browser/navigateTo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-        if (!response.ok) throw new Error(`Backend navigation error: ${response.statusText}`);
-        const result = await response.json();
-        return `Navigation to ${url} initiated. Page title from headless browser: '${result.pageTitle}'. iframe updated.`;
-      } catch (e) {
-        return `Error during navigation: ${e.message}`;
+        console.warn("window.skyscopeBrowser.loadUrl not found.");
+        return "Browser pane not available to navigate.";
       }
     }
   });
 
   useCopilotAction({
     name: "getCurrentBrowserPageContent",
-    description: "Fetches the main text content of a given URL using a headless browser. If no URL is provided, it attempts to use the URL from the visible browser pane.",
+    description: "Fetches the main text content of a given URL using a headless browser. If no URL is provided, it attempts to use the URL from the visible browser/Morphic pane.",
     parameters: [{ name: "url", type: "string", description: "Optional URL. If not provided, uses the current URL from the app's browser pane.", required: false }],
     handler: async ({ url: targetUrl }) => {
       let urlToFetch = targetUrl;
-      if (!urlToFetch) {
-        if (window.skyscopeBrowser && typeof window.skyscopeBrowser.getCurrentUrl === 'function') {
-          urlToFetch = window.skyscopeBrowser.getCurrentUrl();
+      if (!urlToFetch && window.skyscopeBrowser?.getCurrentUrl) urlToFetch = window.skyscopeBrowser.getCurrentUrl();
+
+      if (!urlToFetch || urlToFetch === 'about:blank' || urlToFetch === 'http://localhost:3002/') {
+        if (urlToFetch === 'http://localhost:3002/') {
+          return "Currently on Morphic homepage. Please perform a search within Morphic or specify a URL with content to fetch.";
         }
+        return "Browser URL is not available, is blank, or is on the default Morphic homepage. Please navigate to a content page or specify a URL.";
       }
-      if (!urlToFetch || urlToFetch === 'about:blank') {
-        return "Browser URL is not available or no URL specified.";
-      }
+
       console.log("Action: getCurrentBrowserPageContent called for URL:", urlToFetch);
       try {
         const response = await fetch('http://localhost:3001/api/browser/getPageContent', {
@@ -163,7 +129,6 @@ export default function HomePage() {
         });
         if (!response.ok) throw new Error(`Backend getPageContent error: ${response.statusText}`);
         const result = await response.json();
-        // For brevity, return a snippet or summary. Full content can be very long.
         return `Content fetched for ${result.url}. Snippet: ${result.content ? result.content.substring(0, 500) + '...' : 'No content found.'}`;
       } catch (e) {
         return `Error fetching page content: ${e.message}`;
@@ -171,13 +136,10 @@ export default function HomePage() {
     }
   });
 
-  // --- GitHub Actions ---
   useCopilotAction({
     name: "fetchUserRepositories",
     description: "Fetches the list of repositories for a GitHub user, given a Personal Access Token (PAT).",
-    parameters: [
-      { name: "githubToken", type: "string", description: "The GitHub Personal Access Token.", required: true },
-    ],
+    parameters: [ { name: "githubToken", type: "string", description: "The GitHub Personal Access Token.", required: true }, ],
     handler: async ({ githubToken }) => {
       console.log("Action: fetchUserRepositories called");
       if (!githubToken) return "GitHub token is required.";
@@ -189,9 +151,7 @@ export default function HomePage() {
         const data = await response.json();
         const repoNames = data.map(repo => repo.name);
         return `User Repositories: ${repoNames.join(', ') || 'No repositories found.'}`;
-      } catch (e) {
-        return `Error fetching GitHub repositories: ${e.message}`;
-      }
+      } catch (e) { return `Error fetching GitHub repositories: ${e.message}`; }
     }
   });
 
@@ -214,17 +174,14 @@ export default function HomePage() {
         if (!response.ok) throw new Error(`GitHub API Error: ${response.status} ${await response.text()}`);
         const data = await response.json();
         if (data.content && data.encoding === 'base64') {
-          const decodedContent = atob(data.content); // Basic base64 decoding
+          const decodedContent = atob(data.content);
           return `Content of ${path}:\n${decodedContent}`;
         }
         return "File content not found or not base64 encoded.";
-      } catch (e) {
-        return `Error fetching file content: ${e.message}`;
-      }
+      } catch (e) { return `Error fetching file content: ${e.message}`; }
     }
   });
 
-  // --- Hugging Face Actions ---
   useCopilotAction({
     name: "listHuggingFaceModels",
     description: "Lists models from Hugging Face Hub. Can be filtered by a search query.",
@@ -245,9 +202,7 @@ export default function HomePage() {
         const data = await response.json();
         const modelIds = data.map(model => `ID: ${model.modelId}, Pipeline: ${model.pipeline_tag || 'N/A'}, Likes: ${model.likes || 0}`);
         return `Hugging Face Models:\n${modelIds.join('\n') || 'No models found.'}\`;
-      } catch (e) {
-        return `Error listing HF models: ${e.message}`;
-      }
+      } catch (e) { return `Error listing HF models: ${e.message}`; }
     }
   });
 
@@ -268,13 +223,10 @@ export default function HomePage() {
         if (!response.ok) throw new Error(`HF API Error: ${response.status} ${await response.text()}`);
         const data = await response.json();
         return `Model Info (${modelId}):\n${JSON.stringify(data, null, 2)}`;
-      } catch (e) {
-        return `Error getting HF model info: ${e.message}`;
-      }
+      } catch (e) { return `Error getting HF model info: ${e.message}`; }
     }
   });
 
-  // --- Google Search Action ---
   useCopilotAction({
     name: "googleSearch",
     description: "Performs a web search using Google Custom Search API.",
@@ -294,19 +246,167 @@ export default function HomePage() {
         if (data.items && data.items.length > 0) {
           const results = data.items.map(item => `Title: ${item.title}\nLink: ${item.link}\nSnippet: ${item.snippet}`).join('\n---\n');
           return `Google Search Results for "${query}":\n${results}`;
-        } else if (data.error) {
-            return `Google API Error: ${data.error.message}`;
-        }
+        } else if (data.error) { return `Google API Error: ${data.error.message}`; }
         return "No results found.";
+      } catch (e) { return `Error performing Google search: ${e.message}`; }
+    }
+  });
+
+  useCopilotAction({
+    name: "researchAndSummarizeTopic",
+    description: "Researches a topic using Google, fetches content from a top result, and summarizes it using an Ollama model. Requires Google API Key and CX ID.",
+    parameters: [
+      { name: "topic", type: "string", description: "The topic to research and summarize.", required: true },
+      { name: "googleApiKey", type: "string", description: "Your Google API Key for Custom Search.", required: true },
+      { name: "googleCxId", type: "string", description: "Your Google Custom Search Engine ID (CX ID).", required: true },
+    ],
+    handler: async ({ topic, googleApiKey, googleCxId }) => {
+      console.log(`Action: researchAndSummarizeTopic for '${topic}'`);
+      if (!topic || !googleApiKey || !googleCxId) return "Topic, Google API Key, and CX ID are required.";
+      const ollamaModelForSummarization = document.getElementById('ollama-model-input')?.value || 'llama3';
+      try {
+        const response = await fetch('http://localhost:3001/api/copilotkit/researchAndSummarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, ollamaModel: ollamaModelForSummarization, googleApiKey, googleCxId })
+        });
+        const result = await response.json();
+        if (!response.ok) return `Error in research/summarization workflow: ${result.error || response.statusText}. Log: ${JSON.stringify(result.log)}`;
+        if (window.skyscopeTerminal?.appendToOutput) result.log.forEach(logEntry => window.skyscopeTerminal.appendToOutput(logEntry, 'info'));
+        return `Research & Summary for "${topic}":\nSource: ${result.firstResultTitle} (${result.firstResultLink})\nSummary:\n${result.summary}`;
+      } catch (e) { return `Frontend Error calling research/summarization workflow: ${e.message}`; }
+    }
+  });
+
+  useCopilotAction({
+    name: "searchWithMorphic",
+    description: "Opens the Morphic AI Search Engine within SKYSCOPE AI, optionally with a specific search query. Morphic must be running separately on http://localhost:3002.",
+    parameters: [ { name: "query", type: "string", description: "The search query for Morphic (optional).", required: false }, ],
+    handler: async ({ query }) => {
+      let morphicUrl = "http://localhost:3002";
+      if (query && query.trim() !== "") morphicUrl += `/search?q=${encodeURIComponent(query.trim())}`;
+      if (window.skyscopeBrowser?.loadUrl) {
+        window.skyscopeBrowser.loadUrl(morphicUrl);
+        return `Morphic Search interface loaded in the browser pane. Searching for: "${query || 'homepage'}". Please interact with Morphic directly in its pane.`;
+      } else { return "Browser pane is not available to load Morphic."; }
+    }
+  });
+
+  useCopilotAction({
+      name: "describeImageFromUrl",
+      description: "Fetches an image from a public URL, sends it with a text prompt to a multimodal Ollama model, and returns the model's textual response (e.g., description, analysis).",
+      parameters: [
+        { name: "imageUrl", type: "string", description: "The publicly accessible URL of the image to describe.", required: true },
+        { name: "prompt", type: "string", description: "Your question or instruction about the image (e.g., 'What objects are in this image?', 'Describe this scene in detail.').", required: true },
+        { name: "ollamaModel", type: "string", description: "The multimodal Ollama model to use (e.g., 'llava', 'bakllava', 'qwen:7b-chat-q5_K_M'). Defaults to 'llava' if not specified by user.", required: false }
+      ],
+      handler: async ({ imageUrl, prompt, ollamaModel }) => {
+        console.log(`Action: describeImageFromUrl for URL '${imageUrl}' with prompt '${prompt}' using model '${ollamaModel || 'llava'}'`);
+        const modelToUse = ollamaModel || document.getElementById('ollama-model-input')?.value || 'llava';
+        if (!imageUrl || !prompt) return "Image URL and a prompt are required to describe an image.";
+        if (!imageUrl.toLowerCase().startsWith('http://') && !imageUrl.toLowerCase().startsWith('https://')) return "Invalid Image URL provided. It must start with http:// or https://";
+        try {
+          const response = await fetch('http://localhost:3001/api/copilotkit/describeImageUrl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl, prompt, ollamaModel: modelToUse })
+          });
+          const result = await response.json();
+          if (!response.ok) return `Error describing image: ${result.error || response.statusText}`;
+          return `Description for image at ${imageUrl}:\n${result.description}`;
+        } catch (e) { return `Frontend error calling describeImageFromUrl: ${e.message}`; }
+      }
+    });
+
+  useCopilotAction({
+    name: "readLocalFileContentForAI",
+    description: "Reads the content of a local file specified by a path. For security, path access is restricted. Returns file content or an error.",
+    parameters: [
+      { name: "filePath", type: "string", description: "The absolute path to the local file.", required: true }
+    ],
+    handler: async ({ filePath }) => {
+      console.log(`Action: readLocalFileContentForAI for path: ${filePath}`);
+      if (!window.electronIPC) return "Electron IPC bridge not available.";
+      try {
+        // Basic check (example - real validation should be in main process)
+        if (filePath.includes('..') || !filePath.startsWith('/')) { // Very basic check for Unix-like paths
+           // For Windows, a similar check might be !path.isAbsolute(filePath) or specific drive letter checks
+           // This check is illustrative and not exhaustive for security.
+           console.warn("readLocalFileContentForAI: Attempting to access potentially relative or non-absolute path:", filePath);
+           // Depending on strictness, could return error here. For now, let main process handle it.
+           // return "Error: Invalid or potentially unsafe file path. Absolute paths are preferred.";
+        }
+        const result = await window.electronIPC.invoke('read-local-file', filePath);
+        if (result.error) return `Error reading file: ${result.error}`;
+        // Consider truncating very large files before returning to AI context
+        const content = result.content;
+        if (content.length > 20000) { // Example limit
+            console.warn(`File content for ${filePath} is very large (${content.length} chars), returning truncated version to AI.`);
+            return `File content (truncated):\n${content.substring(0, 20000)}...`;
+        }
+        return content;
       } catch (e) {
-        return `Error performing Google search: ${e.message}`;
+        return `IPC Error reading file: ${e.message}`;
       }
     }
   });
 
-  // --- Update listAvailableTools Action ---
   useCopilotAction({
-    name: "listAvailableTools", // This replaces the previous one or ensure only one is active
+    name: "analyzeFileContentAndSuggestChanges",
+    description: "Analyzes the provided text content (e.g., from a file) based on a task prompt, suggests changes using an Ollama model, and asks for user approval of suggestions. Does NOT apply changes.",
+    parameters: [
+      { name: "textContent", type: "string", description: "The text content to analyze.", required: true },
+      { name: "analysisTaskPrompt", type: "string", description: "The specific task or question for analyzing the content (e.g., 'Identify potential bugs and suggest fixes', 'Rewrite this for clarity').", required: true },
+      { name: "ollamaModel", type: "string", description: "Ollama model to use for analysis (e.g., 'llama3').", required: false }
+    ],
+    handler: async ({ textContent, analysisTaskPrompt, ollamaModel }) => {
+      const modelToUse = ollamaModel || document.getElementById('ollama-model-input')?.value || 'llama3';
+      console.log(`Action: analyzeFileContentAndSuggestChanges using ${modelToUse}`);
+
+      try {
+        const response = await fetch('http://localhost:3001/api/copilotkit/analyzeTextContent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ textContent, analysisTaskPrompt, ollamaModel: modelToUse })
+        });
+        const analysisResult = await response.json();
+
+        if (!response.ok) {
+          return `Error during content analysis: ${analysisResult.error || response.statusText}. Raw: ${analysisResult.raw_response || ''}`;
+        }
+
+        let formattedSuggestions = "No specific suggestions format returned or suggestions not found.";
+        if (analysisResult.suggestions && Array.isArray(analysisResult.suggestions)) {
+          if (analysisResult.suggestions.length === 0) {
+            formattedSuggestions = "AI analysis complete: No specific change suggestions were provided.";
+          } else {
+            formattedSuggestions = analysisResult.suggestions.map((s, i) =>
+              `Suggestion ${i+1}:\nFinding: ${s.finding || 'N/A'}\nOriginal: "${s.original_snippet || 'N/A'}"\nSuggested Change: "${s.suggested_change || 'N/A'}"\nReason: ${s.reason || 'N/A'}`
+            ).join('\n---\n');
+          }
+        } else if (analysisResult.raw_response) { // If backend sent raw due to parse error
+            formattedSuggestions = `AI analysis (raw response):\n${analysisResult.raw_response}`;
+        } else if (typeof analysisResult === 'object') {
+          formattedSuggestions = `AI analysis (JSON response):\n${JSON.stringify(analysisResult, null, 2)}`;
+        }
+
+        // SIMULATE USER APPROVAL STEP
+        const userApproved = confirm(`AI Analysis Complete. Suggestions:\n\n${formattedSuggestions}\n\nDo you approve these suggestions? (This is a mock approval - no changes will be applied yet)`);
+
+        if (userApproved) {
+          return `User APPROVED the following suggestions (no changes applied yet):\n${formattedSuggestions}`;
+        } else {
+          return `User REJECTED the suggestions.\n${formattedSuggestions}`;
+        }
+
+      } catch (e) {
+        return `Frontend error during analysis workflow: ${e.message}`;
+      }
+    }
+  });
+
+  useCopilotAction({
+    name: "listAvailableTools",
     description: "Get a list of available tools or actions that I (the AI) can use.",
     parameters: [],
     handler: async () => {
@@ -322,12 +422,75 @@ export default function HomePage() {
         { name: "listHuggingFaceModels", description: "Lists models from Hugging Face Hub (optional token, search query)." },
         { name: "getHuggingFaceModelInfo", description: "Gets info for a specific HF model (optional token)." },
         { name: "googleSearch", description: "Performs a Google web search (requires API key and CX ID)." },
+        { name: "researchAndSummarizeTopic", description: "Researches a topic using Google, fetches content, and summarizes it." },
+        { name: "searchWithMorphic", description: "Opens Morphic AI Search with an optional query in the browser pane." },
+        { name: "describeImageFromUrl", description: "Describes an image from a URL using a multimodal Ollama model." },
+        { name: "readLocalFileContentForAI", description: "Reads content of a local file for AI analysis." },
+        { name: "analyzeFileContentAndSuggestChanges", description: "Analyzes text content, suggests changes, and asks for user approval (mocked)." },
         { name: "listAvailableTools", description: "Lists these available tools." }
-      ];
+      ].sort((a,b) => a.name.localeCompare(b.name));
       console.log("Action: listAvailableTools called");
-      return JSON.stringify(availableTools.sort((a,b) => a.name.localeCompare(b.name)), null, 2);
+      return JSON.stringify(availableTools, null, 2);
     }
   });
+
+  useEffect(() => {
+    const createAgentsButton = document.getElementById('create-sample-agents-button');
+    const agentCreationOutput = document.getElementById('agent-creation-output');
+    const agentIdGoalInput = document.getElementById('agent-id-goal-input');
+    const agentGoalInput = document.getElementById('agent-goal-input');
+    const setAgentGoalButton = document.getElementById('set-agent-goal-button');
+    const agentGoalOutput = document.getElementById('agent-goal-output');
+    const runAgentCycleButton = document.getElementById('run-agent-cycle-button');
+    const stopAgentCycleButton = document.getElementById('stop-agent-cycle-button');
+    const ollamaModelInput = document.getElementById('ollama-model-input');
+
+    if (createAgentsButton && agentManager) {
+        createAgentsButton.addEventListener('click', () => {
+            try {
+                const agent1 = new Agent('agent1', 'a helpful assistant specialized in creative writing and storytelling.');
+                const agent2 = new Agent('agent2', 'a factual assistant specialized in explaining scientific concepts and historical events.');
+                agentManager.registerAgent(agent1);
+                agentManager.registerAgent(agent2);
+                if(agentCreationOutput) agentCreationOutput.textContent = "Agent 'agent1' & 'agent2' registered.";
+            } catch (e) {
+                if(agentCreationOutput) agentCreationOutput.textContent = "Error creating agents: " + e.message;
+            }
+        });
+    }
+    if (setAgentGoalButton && agentManager) {
+        setAgentGoalButton.addEventListener('click', () => {
+            const agentId = agentIdGoalInput.value.trim();
+            const goal = agentGoalInput.value.trim();
+            if (agentId && goal) {
+                if (agentManager.getAgentById(agentId)) {
+                    agentManager.setAgentGoal(agentId, goal);
+                    if(agentGoalOutput) agentGoalOutput.textContent = `Goal for '${agentId}' set. Added to queue.`;
+                } else {
+                    if(agentGoalOutput) agentGoalOutput.textContent = `Agent '${agentId}' not found.`;
+                }
+            } else {
+                if(agentGoalOutput) agentGoalOutput.textContent = "Agent ID and Goal are required.";
+            }
+        });
+    }
+    if (runAgentCycleButton && agentManager) {
+        runAgentCycleButton.addEventListener('click', () => {
+            const modelName = ollamaModelInput?.value.trim() || 'llama3';
+            const agentActivityOutput = document.getElementById('agent-activity-log-monitor');
+            if (agentActivityOutput) agentActivityOutput.textContent = `Attempting to start agent cycle with model: ${modelName}...\n`;
+            agentManager.startAgentCycle(modelName, 'agent-activity-log-monitor');
+        });
+    }
+    if (stopAgentCycleButton && agentManager) {
+        stopAgentCycleButton.addEventListener('click', () => {
+             agentManager.stopAgentCycle();
+             const agentActivityOutput = document.getElementById('agent-activity-log-monitor');
+             if (agentActivityOutput) agentActivityOutput.textContent += "Stop cycle requested by user.\n";
+        });
+    }
+  }, [agentManager]);
+
 
   return (
     <div className="skyscope-app">
@@ -337,11 +500,11 @@ export default function HomePage() {
       </Head>
       <CodeAnimatorComponent />
       <HeaderComponent />
-      <PaneLayoutComponent />
+      <PaneLayoutComponent agentManagerInstance={agentManager} />
       <FooterComponent />
 
       <CopilotPopup
-        instructions="You are SKYSCOPE AI. You can use various tools like executing terminal commands (e.g., 'execute terminal command pwd'), browsing (e.g., 'navigate to wikipedia.org'), fetching GitHub repos/files, searching HuggingFace, or performing Google searches. Ask 'what tools can you use?' to see all. For some tools, I might need API keys/tokens from you."
+        instructions="You are SKYSCOPE AI. You can use various tools like executing terminal commands, browsing, GitHub, HuggingFace, Google Search, research & summarization, opening Morphic AI Search, describing images from URLs, or reading local files (provide safe, absolute paths) and analyzing their content (e.g., 'read file /path/to/my/text.txt then analyze its content to improve clarity'). Ask 'what tools can you use?' to see all. API keys/tokens might be needed for some tools."
         defaultOpen={true}
         labels={{
           title: "SKYSCOPE AI Assistant",
@@ -349,7 +512,6 @@ export default function HomePage() {
         }}
       />
       {/* Old test areas for direct API key input can be kept for now as a manual way for user to provide keys if AI asks */}
-      {/* The existing HTML for ollama-test-area, github-test-area, hf-test-area, google-api-test-area should remain for this purpose if they exist */}
     </div>
   );
 }
