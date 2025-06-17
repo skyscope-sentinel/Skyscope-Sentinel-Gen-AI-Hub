@@ -39,20 +39,73 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
-  // IPC Handler for executing terminal commands
+  /**
+   * @file electron_main.js
+   * Handles IPC events for executing shell commands requested by the renderer process.
+   * Security Warning: Directly executing commands received via IPC can be a significant security risk
+   * if the commands are not rigorously sanitized or if the source of the commands is not trusted.
+   * In a production application, implement strict validation, command allowlisting, or
+   * use safer alternatives to direct shell execution.
+   */
+
+  /**
+   * Handles the 'execute-command' IPC call from the renderer process.
+   * Executes a given shell command using Node.js `child_process.exec`.
+   * Includes a timeout for the command execution.
+   *
+   * @param {IpcMainEvent} event - The IPC event object (not directly used but part of signature).
+   * @param {string} commandToExecute - The shell command string to be executed.
+   * @returns {Promise<object>} A promise that resolves to an object with the execution result.
+   *    On success: { stdout: string, stderr: string, error: null, code: 0 }
+   *    On error:   { stdout: string, stderr: string, error: string (error message), code: number (exit code) }
+   */
   ipcMain.handle('execute-command', async (event, commandToExecute) => {
-    console.log(`Main Process: Received command to execute: ${commandToExecute}`);
-    // WARNING: Executing arbitrary commands is a security risk.
+    console.log(`Main Process: Received command to execute: "${commandToExecute}"`);
+
+    // Timeout for the shell command execution.
+    const EXEC_TIMEOUT = 30000; // 30 seconds
+
     return new Promise((resolve) => {
-      exec(commandToExecute, (error, stdout, stderr) => {
+      exec(commandToExecute, { timeout: EXEC_TIMEOUT }, (error, stdout, stderr) => {
+        // Ensure stdout and stderr are strings, even if empty, for consistent return structure.
+        const currentStdout = stdout || '';
+        const currentStderr = stderr || '';
+
         if (error) {
-          console.error(`Main Process: exec error for command '${commandToExecute}': ${error.message}`);
-          resolve({ stdout: stdout || '', stderr: stderr || '', error: error.message, code: error.code });
+          console.error(`Main Process: exec error for command "${commandToExecute}": ${error.message}`);
+          let specificError = error.message;
+          // Check if the error was due to the timeout.
+          if (error.killed && error.signal === 'SIGTERM') {
+            specificError = `Command timed out after ${EXEC_TIMEOUT / 1000} seconds.`;
+          } else if (error.code === 127) { // 'command not found' often returns 127 on POSIX systems.
+            specificError = `Command not found: ${commandToExecute.split(' ')[0]}`;
+          }
+          resolve({
+            stdout: currentStdout,
+            stderr: currentStderr,
+            error: specificError,
+            // Provide a default error code if none exists on the error object.
+            code: typeof error.code === 'number' ? error.code : -1
+          });
           return;
         }
-        console.log(`Main Process: stdout for '${commandToExecute}': ${stdout}`);
-        if (stderr) console.warn(`Main Process: stderr for '${commandToExecute}': ${stderr}`);
-        resolve({ stdout, stderr, error: null, code: 0 });
+
+        // Log stdout and stderr even on success for debugging/visibility in main process logs.
+        if (currentStdout) {
+          console.log(`Main Process: stdout for "${commandToExecute}":\n${currentStdout}`);
+        }
+        if (currentStderr) {
+          // stderr is not always an error; some commands output informational messages to stderr.
+          console.warn(`Main Process: stderr for "${commandToExecute}":\n${currentStderr}`);
+        }
+
+        // Resolve with success status.
+        resolve({
+          stdout: currentStdout,
+          stderr: currentStderr,
+          error: null,
+          code: 0
+        });
       });
     });
   });

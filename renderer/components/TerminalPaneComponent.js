@@ -16,14 +16,16 @@ const TerminalPaneComponent = () => {
 
   useEffect(scrollToBottom, [outputLines]);
 
+  // This function updates the component's state, causing a re-render.
   const appendToOutput = (text, type = 'output') => {
     let lineTypeClass = 'terminal-output-line';
     if (type === 'command') lineTypeClass = 'terminal-command-line';
     else if (type === 'error') lineTypeClass = 'terminal-error-line';
-    else if (type === 'info') lineTypeClass = 'terminal-info-line'; // Example for a new type
+    else if (type === 'info') lineTypeClass = 'terminal-info-line';
 
     const prefix = type === 'command' ? '> ' : '';
-    const lines = String(text).split('\n'); // Split multiline output
+    // Handle multi-line text by creating multiple entries
+    const lines = String(text).split('\n');
     const newOutputEntries = lines.map(line => ({ text: prefix + line, typeClass: lineTypeClass }));
     setOutputLines(prev => [...prev, ...newOutputEntries]);
   };
@@ -35,11 +37,12 @@ const TerminalPaneComponent = () => {
   const handleInputSubmit = async () => {
     if (inputValue.trim() === '') return;
     const command = inputValue.trim();
-    appendToOutput(command, 'command'); // Echo command
+
+    appendToOutput(command, 'command'); // Use the state-updating appendToOutput
     setInputValue('');
 
     if (command.toLowerCase() === 'clear') {
-      setOutputLines([{ text: "Terminal cleared.", typeClass: 'terminal-info-line' }]);
+      setOutputLines([{ text: "Terminal cleared. Type 'help' for commands.", typeClass: 'terminal-info-line' }]);
       return;
     }
     if (command.toLowerCase() === 'help') {
@@ -47,29 +50,39 @@ const TerminalPaneComponent = () => {
         return;
     }
 
-    if (window.electronIPC) {
+    if (window.electronIPC && typeof window.electronIPC.invoke === 'function') {
       try {
-        appendToOutput(`Executing via IPC: ${command}`, 'info');
+        // appendToOutput(`Executing: ${command}`, 'info'); // Already echoed as command
         const result = await window.electronIPC.invoke('execute-command', command);
         if (result.stdout) appendToOutput(result.stdout.trim(), 'output');
         if (result.stderr) appendToOutput(result.stderr.trim(), 'error');
-        if (result.error && !result.stderr) appendToOutput(`Error: ${result.error} (Code: ${result.code})`, 'error');
+        // Avoid double-printing error if stderr already contained it
+        if (result.error && (!result.stderr || !result.stderr.includes(result.error))) {
+            appendToOutput(`Error: ${result.error} (Code: ${result.code})`, 'error');
+        } else if (result.error && result.stderr && result.stderr.includes(result.error)) {
+            // If stderr contained the error message, we've already printed it.
+            // We might still want to log the code if it's different or provides more info.
+            // For now, covered by stderr print.
+        }
+
       } catch (e) {
         appendToOutput(`IPC Error: ${e.message}`, 'error');
       }
     } else {
-      appendToOutput("Error: electronIPC not available. Command not sent to main process.", 'error');
+      const noIPCMessage = "Error: electronIPC not available. Cannot execute command directly from terminal input.";
+      appendToOutput(noIPCMessage, 'error');
     }
   };
 
+  // Expose the state-updating appendToOutput function to the window context
   useEffect(() => {
-    window.skyscopeTerminal = { appendToOutput };
-    // Welcome message or initial focus
+    window.skyscopeTerminal = { appendToOutput: appendToOutput };
+
     const inputField = document.getElementById('terminal-input');
     if (inputField) inputField.focus();
 
     return () => { delete window.skyscopeTerminal; };
-  }, []);
+  }, [appendToOutput]); // Add appendToOutput to dependency array as it's defined in component scope
 
 
   return (
@@ -91,7 +104,7 @@ const TerminalPaneComponent = () => {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={(e) => e.key === 'Enter' && handleInputSubmit()}
-            // autoFocus // autoFocus might not work reliably after initial render, using focus() in useEffect
+            // autoFocus attribute might be sufficient, but useEffect focus is more reliable after re-renders.
           />
         </div>
       </div>
