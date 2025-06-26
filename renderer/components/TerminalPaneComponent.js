@@ -1,7 +1,7 @@
 // renderer/components/TerminalPaneComponent.js
 import React, { useState, useEffect, useRef } from 'react';
 
-const TerminalPaneComponent = () => {
+const TerminalPaneComponent = ({ onTerminalOutputUpdate }) => { // Accept onTerminalOutputUpdate prop
   const [outputLines, setOutputLines] = useState([
     { text: "SKYSCOPE AI Terminal [v0.2.0 - Electron Integrated]", typeClass: 'terminal-output-line' },
     { text: "Enter commands below or have the AI execute them.", typeClass: 'terminal-output-line' },
@@ -16,7 +16,15 @@ const TerminalPaneComponent = () => {
 
   useEffect(scrollToBottom, [outputLines]);
 
-  // This function updates the component's state, causing a re-render.
+  // Effect to call onTerminalOutputUpdate when outputLines change
+  useEffect(() => {
+    if (onTerminalOutputUpdate) {
+      // Send a summary or tail of lines, e.g., last 10-20 lines
+      // The parent (HomePage) will handle slicing if it needs fewer.
+      onTerminalOutputUpdate(outputLines.map(line => line.text));
+    }
+  }, [outputLines, onTerminalOutputUpdate]);
+
   const appendToOutput = (text, type = 'output') => {
     let lineTypeClass = 'terminal-output-line';
     if (type === 'command') lineTypeClass = 'terminal-command-line';
@@ -24,7 +32,6 @@ const TerminalPaneComponent = () => {
     else if (type === 'info') lineTypeClass = 'terminal-info-line';
 
     const prefix = type === 'command' ? '> ' : '';
-    // Handle multi-line text by creating multiple entries
     const lines = String(text).split('\n');
     const newOutputEntries = lines.map(line => ({ text: prefix + line, typeClass: lineTypeClass }));
     setOutputLines(prev => [...prev, ...newOutputEntries]);
@@ -38,7 +45,7 @@ const TerminalPaneComponent = () => {
     if (inputValue.trim() === '') return;
     const command = inputValue.trim();
 
-    appendToOutput(command, 'command'); // Use the state-updating appendToOutput
+    appendToOutput(command, 'command');
     setInputValue('');
 
     if (command.toLowerCase() === 'clear') {
@@ -52,38 +59,26 @@ const TerminalPaneComponent = () => {
 
     if (window.electronIPC && typeof window.electronIPC.invoke === 'function') {
       try {
-        // appendToOutput(`Executing: ${command}`, 'info'); // Already echoed as command
         const result = await window.electronIPC.invoke('execute-command', command);
         if (result.stdout) appendToOutput(result.stdout.trim(), 'output');
         if (result.stderr) appendToOutput(result.stderr.trim(), 'error');
-        // Avoid double-printing error if stderr already contained it
         if (result.error && (!result.stderr || !result.stderr.includes(result.error))) {
             appendToOutput(`Error: ${result.error} (Code: ${result.code})`, 'error');
-        } else if (result.error && result.stderr && result.stderr.includes(result.error)) {
-            // If stderr contained the error message, we've already printed it.
-            // We might still want to log the code if it's different or provides more info.
-            // For now, covered by stderr print.
         }
-
       } catch (e) {
         appendToOutput(`IPC Error: ${e.message}`, 'error');
       }
     } else {
-      const noIPCMessage = "Error: electronIPC not available. Cannot execute command directly from terminal input.";
-      appendToOutput(noIPCMessage, 'error');
+      appendToOutput("Error: electronIPC not available. Cannot execute command directly from terminal input.", 'error');
     }
   };
 
-  // Expose the state-updating appendToOutput function to the window context
   useEffect(() => {
     window.skyscopeTerminal = { appendToOutput: appendToOutput };
-
     const inputField = document.getElementById('terminal-input');
     if (inputField) inputField.focus();
-
     return () => { delete window.skyscopeTerminal; };
-  }, [appendToOutput]); // Add appendToOutput to dependency array as it's defined in component scope
-
+  }, [appendToOutput]); // appendToOutput is stable if defined with useCallback or if it has no deps from component scope
 
   return (
     <div className="pane terminal-pane" id="terminal-pane">
@@ -104,7 +99,6 @@ const TerminalPaneComponent = () => {
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={(e) => e.key === 'Enter' && handleInputSubmit()}
-            // autoFocus attribute might be sufficient, but useEffect focus is more reliable after re-renders.
           />
         </div>
       </div>

@@ -470,14 +470,32 @@ app.post('/api/copilotkit/analyzeTextContent', async (req, res) => {
   const OLLAMA_ANALYSIS_TIMEOUT = 35000; // 35 seconds for analysis tasks
 
   try {
+    // Construct messages for Ollama
     const messages = [
       {
         role: "system",
-        content: "You are an AI assistant that analyzes text and provides suggestions in a structured JSON format. The JSON should have a key 'suggestions' which is an array of objects, each with 'finding', 'original_snippet', 'suggested_change', and 'reason'."
+        content: "You are an AI assistant. Your task is to analyze the provided text content based on the user's specific analysis task. " +
+                 "Please provide your findings and suggestions in a structured JSON format. " +
+                 "The root object should have a key 'suggestions', which is an array of objects. " +
+                 "Each suggestion object must contain the following keys: " +
+                 "'finding' (a brief description of what you found or the context), " +
+                 "'reason' (why a change is suggested or why the finding is relevant), " +
+                 "'original_snippet' (the exact, complete block of text from the original content that this suggestion pertains to), " +
+                 "and 'suggested_change' (the exact, complete block of text as it should be after your suggested modification. If no change, this can be empty or repeat the original). " +
+                 "Ensure 'original_snippet' and 'suggested_change' are well-defined blocks, even if multi-line, using markdown code blocks (```) if appropriate for code."
       },
       {
         role: "user",
-        content: `Analyze the following text content based on the task: "${analysisTaskPrompt}".\n\nText Content:\n"""\n${textContent.substring(0, 15000)}\n"""\n\nPlease provide your analysis and suggestions in the specified JSON structure.`
+        // Ensure textContent is not excessively long to keep prompts manageable for the LLM and avoid token limits.
+        // The substring(0, 15000) is a good general limit.
+        content: `Analysis Task: "${analysisTaskPrompt}"
+
+Text Content to Analyze:
+\`\`\`
+${textContent.substring(0, 15000)}
+\`\`\`
+
+Please provide your analysis and suggestions strictly in the JSON structure defined in the system prompt.`
       }
     ];
 

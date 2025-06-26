@@ -1,119 +1,143 @@
 // renderer/components/BrowserPaneComponent.js
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-const BrowserPaneComponent = () => {
-  const morphicDefaultUrl = "http://localhost:3002"; // Morphic running here
-  const [iframeSrc, setIframeSrc] = useState(morphicDefaultUrl);
-  const [urlInputValue, setUrlInputValue] = useState(morphicDefaultUrl);
+const BrowserPaneComponent = ({ onBrowserUrlChange }) => {
+  const morphicHomeUrl = "http://localhost:3002";
+  const [iframeSrc, setIframeSrc] = useState(morphicHomeUrl);
+  const [urlInputValue, setUrlInputValue] = useState(morphicHomeUrl);
   const iframeRef = useRef(null);
-  const urlInputRef = useRef(null);
+  const urlInputRef = useRef(null); // To allow focusing the input field
 
-  const ensureProtocol = (urlStr) => {
-    if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
-      return 'https://' + urlStr; // Default to https if protocol missing
+  const ensureProtocol = useCallback((urlStr) => {
+    // Do not add protocol to about:blank
+    if (urlStr && urlStr.toLowerCase() === 'about:blank') {
+        return urlStr;
+    }
+    if (urlStr && !urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+      return 'https://' + urlStr;
     }
     return urlStr;
-  };
+  }, []);
 
-  const handleGo = () => {
+  const handleGo = useCallback(() => {
     if (urlInputValue.trim()) {
-      const validatedUrl = ensureProtocol(urlInputValue.trim());
-      setUrlInputValue(validatedUrl); // Update input field state
-      setIframeSrc(validatedUrl);     // Update iframe src state
+      const newUrl = ensureProtocol(urlInputValue.trim());
+      setUrlInputValue(newUrl); // Update state for input field
+      setIframeSrc(newUrl);     // Update iframe src
+      if (onBrowserUrlChange) onBrowserUrlChange(newUrl);
     }
-  };
+  }, [urlInputValue, ensureProtocol, onBrowserUrlChange]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       try {
         iframeRef.current.contentWindow.location.reload();
+        // The 'load' event on the iframe will call onBrowserUrlChange
       } catch (e) {
-        console.warn("BrowserPane: Error trying to reload contentWindow.location, falling back to src reset. Error:", e);
-        // Fallback for cross-origin or other issues
-        iframeRef.current.src = iframeRef.current.src;
+        console.warn("BrowserPane: Error trying to reload contentWindow.location, attempting src reset. Error:", e);
+        iframeRef.current.src = iframeRef.current.src; // Fallback src reset
+        if (onBrowserUrlChange) onBrowserUrlChange(iframeRef.current.src); // Manually trigger if reload fails this way
       }
     } else {
       console.warn("BrowserPane: Iframe or its contentWindow not available for refresh.");
     }
-  };
+  }, [onBrowserUrlChange]);
+
+  const loadMorphicHome = useCallback(() => {
+    setUrlInputValue(morphicHomeUrl);
+    setIframeSrc(morphicHomeUrl);
+    if (onBrowserUrlChange) onBrowserUrlChange(morphicHomeUrl);
+  }, [morphicHomeUrl, onBrowserUrlChange]);
 
   useEffect(() => {
-    // Expose functions to global scope for CopilotKit actions
     window.skyscopeBrowser = {
       loadUrl: (newUrl) => {
-        const validatedUrl = newUrl.startsWith('http://') || newUrl.startsWith('https://') ? newUrl : ensureProtocol(newUrl);
-        // Update React state, which will then update the input field's value via its prop
+        const validatedUrl = (newUrl && (newUrl.startsWith('http://') || newUrl.startsWith('https://') || newUrl.startsWith('about:')))
+                             ? newUrl
+                             : ensureProtocol(newUrl);
         setUrlInputValue(validatedUrl);
         setIframeSrc(validatedUrl);
-        console.log(`BrowserPane: iframe src set to ${validatedUrl} via window.skyscopeBrowser.loadUrl`);
+        if (onBrowserUrlChange) onBrowserUrlChange(validatedUrl);
+        console.log(`BrowserPane (Morphic): iframe src set to ${validatedUrl}`);
       },
       getCurrentUrl: () => {
         if (!iframeRef.current) {
-          console.warn("BrowserPane: getCurrentUrl called but iframeRef is not set. Returning input value as fallback.");
           return urlInputValue;
         }
         try {
-            // Prefer contentWindow.location.href as it's more accurate after internal navigations.
-            // Fallback to iframe.src if contentWindow is inaccessible (CORS) or location is about:blank.
             const contentLocation = iframeRef.current.contentWindow?.location?.href;
             if (contentLocation && contentLocation !== 'about:blank') {
                 return contentLocation;
             }
-            return iframeRef.current.src || urlInputValue; // Fallback to src, then input value
+            return iframeRef.current.src || urlInputValue;
         } catch (e) {
-            console.warn("BrowserPane: Error accessing iframe contentWindow.location.href due to CORS. Falling back to iframe.src. Error:", e);
-            return iframeRef.current.src || urlInputValue; // Fallback
+            return iframeRef.current.src || urlInputValue;
         }
       }
     };
 
-    // Set initial value for the controlled input field
-    if(urlInputRef.current && urlInputValue !== urlInputRef.current.value) {
-         urlInputRef.current.value = urlInputValue; // Sync ref-managed input if needed, though value prop should handle it
+    // Set initial URL for the input field when component mounts or iframeSrc changes from outside
+    if(urlInputRef.current && iframeSrc !== urlInputRef.current.value) {
+        // This direct manipulation is okay for initialization or external changes via window object
+        // but day-to-day typing is handled by controlled component pattern.
+        // urlInputRef.current.value = iframeSrc; // No longer needed due to value={urlInputValue}
+    }
+    // Call onBrowserUrlChange on initial mount with the default URL
+    if (onBrowserUrlChange) {
+        onBrowserUrlChange(iframeSrc);
     }
 
-    // Iframe load listener to update URL input (best effort due to CORS)
-    const iframeElement = iframeRef.current;
+    const currentIframe = iframeRef.current;
     const handleIframeLoad = () => {
         try {
-            const currentSrc = iframeElement?.contentWindow?.location?.href;
-            if (currentSrc && currentSrc !== 'about:blank' && currentSrc !== urlInputValue) {
-                 setUrlInputValue(currentSrc); // Update React state, which updates the input field
+            const newLocation = currentIframe?.contentWindow?.location?.href;
+            if (newLocation && newLocation !== 'about:blank') {
+                // Only update if the new location is different from what's already in the input
+                // to avoid potential loops or unnecessary state updates.
+                if (newLocation !== urlInputValue) {
+                    setUrlInputValue(newLocation);
+                }
+                if (onBrowserUrlChange) onBrowserUrlChange(newLocation);
             }
+            // If it's about:blank, we don't want to push that to the URL bar unless it was explicitly set
         } catch (e) {
-            // console.warn("Cannot access iframe src after load due to cross-origin policy.");
+            // Cross-origin issues might prevent accessing contentWindow.location.href
+            // In such cases, we rely on the last known iframeSrc or urlInputValue.
+            // The onBrowserUrlChange would have been called when iframeSrc was set.
+            console.warn("BrowserPane: Could not access iframe's new location after load (likely cross-origin). URL bar may not reflect internal navigation.");
         }
     };
-    if (iframeElement) {
-        iframeElement.addEventListener('load', handleIframeLoad);
+    if (currentIframe) {
+        currentIframe.addEventListener('load', handleIframeLoad);
     }
 
     return () => {
         delete window.skyscopeBrowser;
-        if (iframeElement) {
-            iframeElement.removeEventListener('load', handleIframeLoad);
+        if (currentIframe) {
+            currentIframe.removeEventListener('load', handleIframeLoad);
         }
     };
-  // Rerun this effect if urlInputValue changes internally (e.g. typed by user)
-  // to ensure the input field ref is synced if necessary, though controlled components are preferred.
-  // Primarily, this useEffect is for setting up and tearing down the global skyscopeBrowser object.
-  // If loadUrl directly calls setUrlInputValue, that will trigger its own re-renders.
-  }, [urlInputValue]);
+  // ensureProtocol is memoized with useCallback, onBrowserUrlChange should be too
+  }, [iframeSrc, onBrowserUrlChange, ensureProtocol, urlInputValue]);
 
+  // Sync urlInputValue to iframeSrc if they diverge and user stops typing
+  // This is a bit complex; usually, "Go" button is the explicit trigger.
+  // For now, handleGo and direct AI navigation handle this.
 
   return (
     <div className="pane browser-pane" id="morphic-pane">
-      <h3>Morphic AI Search Engine</h3>
+      <h3><span className="pane-title-icon">🌐</span> Morphic AI Search / Browser</h3>
       <div className="pane-content" id="browser-content-area">
         <div className="browser-controls">
+          <button id="morphic-home-button" className="control-button morphic-home-btn" title="Load Morphic Home" onClick={loadMorphicHome}>Home</button>
           <input
-            ref={urlInputRef} // Still useful for focusing or direct manipulation if ever needed
+            ref={urlInputRef}
             type="text"
             id="browser-url-input"
             className="url-input-field"
-            value={urlInputValue} // Controlled component
+            value={urlInputValue}
             onChange={(e) => setUrlInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleGo()}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleGo(); }}
             placeholder="Enter URL or use AI to navigate"
           />
           <button id="browser-go-button" className="control-button" onClick={handleGo}>Go</button>
@@ -123,10 +147,10 @@ const BrowserPaneComponent = () => {
           ref={iframeRef}
           id="browser-iframe"
           className="iframe-view"
-          src={iframeSrc} // Controlled by React state
+          src={iframeSrc}
+          title="Morphic/Browser View" // Added title for accessibility
           sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"
           onError={(e) => console.error("Iframe loading error:", e.nativeEvent)}
-          // onLoad event is now handled in useEffect for iframeElement
         ></iframe>
         <div className="browser-automation-controls">
           <input
@@ -141,7 +165,7 @@ const BrowserPaneComponent = () => {
             onClick={() => {
               const taskInput = document.getElementById('browser-automation-prompt');
               const task = taskInput ? taskInput.value : '';
-              const currentFrameUrl = iframeRef.current ? iframeRef.current.src : 'about:blank';
+              const currentFrameUrl = iframeRef.current ? (iframeRef.current.contentWindow?.location?.href || iframeRef.current.src) : 'about:blank';
               alert(`AI Task: "${task}" for URL: "${currentFrameUrl}". This could trigger a Morphic search via CopilotKit action.`);
             }}
           >

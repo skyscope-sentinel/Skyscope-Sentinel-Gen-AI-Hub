@@ -1,351 +1,394 @@
 // js/agent_framework.js
 
 /**
- * Represents an autonomous agent with a persona, memory, and goals.
+ * @file agent_framework.js
+ * Defines the Agent class and AgentManager module for creating and managing
+ * autonomous agents within the SKYSCOPE AI application. These agents can
+ * pursue goals, maintain memory, interact with LLMs, and simulate tool usage.
+ */
+
+/**
+ * Represents an autonomous agent with a persona, memory, goals, and action logging.
+ * Agents can be assigned tasks and will attempt to complete them by interacting
+ * with an LLM (via AgentManager) and requesting tool calls.
  */
 class Agent {
     /**
      * Creates an instance of an Agent.
-     * @param {string} id - A unique identifier for the agent.
-     * @param {string} persona - A description of the agent's personality, role, and capabilities.
-     * @param {string[]} [initialMemory=[]] - An optional array of initial memory entries.
+     * @param {string} id - A unique identifier for the agent (e.g., "agent1", "researcher").
+     * @param {string} persona - A description of the agent's personality, role, skills, and limitations.
+     * @param {string[]} [initialMemory=[]] - An optional array of strings representing pre-existing knowledge or context.
      */
     constructor(id, persona, initialMemory = []) {
-        this.id = id; // Unique agent identifier
-        this.persona = persona; // Agent's role/personality description
-        this.memory = [...initialMemory]; // Log of interactions and goals
-        this.currentGoal = ""; // The current objective the agent is working towards
-        this.state = "idle"; // Current state: "idle", "active", "completed_goal", "error"
-        this.microTaskProgress = 0; // Percentage (0-100) completion of the current micro-task
-        this.currentMicroTaskName = "Awaiting goal..."; // Description of the current small step
-        this.actionLog = []; // Log of specific actions taken by the agent
+        this.id = id;
+        this.persona = persona;
+        this.memory = [...initialMemory];
+        this.currentGoal = "";
+        // Updated states: idle, active_processing_llm, awaiting_tool_call, active_processing_tool_result, completed_goal, error
+        this.state = "idle";
+        this.microTaskProgress = 0;
+        this.currentMicroTaskName = "Awaiting goal...";
+        this.actionLog = [];
+        /** @type {string|null} Stores the last error message encountered by the agent. */
+        this.lastError = null;
+        /** @type {{id: string|null, name: string|null, params: string|null, rawRequest: string|null}} Stores details of a requested tool call. */
+        this.requestedTool = { id: null, name: null, params: null, rawRequest: null };
     }
 
     /**
-     * Logs an action taken by the agent.
-     * Keeps a concise history of the last few actions.
+     * Logs an action taken by the agent to its internal `actionLog`.
      * @param {string} actionDescription - A description of the action performed.
      * @param {('info'|'success'|'error'|'warn')} [status='info'] - The status/type of the log entry.
      */
     logAction(actionDescription, status = 'info') {
       const timestamp = new Date().toLocaleTimeString();
-      this.actionLog.push({ timestamp, description: actionDescription, status });
-      if (this.actionLog.length > 10) { // Limit log size to the last 10 entries
+      // Include current state and goal in detailed logs for better context
+      const goalSubstring = this.currentGoal ? this.currentGoal.substring(0,30) : "N/A";
+      const contextDesc = `(State: ${this.state}, Goal: "${goalSubstring}...")`;
+      this.actionLog.push({ timestamp, description: `${actionDescription} ${contextDesc}`, status });
+      if (this.actionLog.length > 10) {
         this.actionLog.shift();
       }
     }
 
     /**
+     * Updates the agent's current state and optionally its micro-task details.
+     * @param {('idle'|'active_processing_llm'|'awaiting_tool_call'|'active_processing_tool_result'|'completed_goal'|'error')} newState - The new state.
+     * @param {string} [microTaskName=null] - Optional new name for the current micro-task.
+     * @param {number} [progress=null] - Optional new progress value (0-100).
+     */
+    setState(newState, microTaskName = null, progress = null) {
+        this.state = newState;
+        if (microTaskName !== null) this.currentMicroTaskName = microTaskName;
+        if (progress !== null) this.microTaskProgress = progress;
+        console.log(`Agent [${this.id}] state: ${newState}, task: "${this.currentMicroTaskName}", progress: ${this.microTaskProgress}%`);
+    }
+
+    /**
+     * Clears any pending tool request details from the agent.
+     * Called after a tool response is received or if a tool call is cancelled.
+     */
+    clearRequestedTool() {
+        this.requestedTool = { id: null, name: null, params: null, rawRequest: null };
+    }
+
+    /**
      * Sets a new goal for the agent.
-     * Resets progress and logs the new goal.
      * @param {string} goal - The new goal description.
      */
     setGoal(goal) {
         this.currentGoal = goal;
-        this.memory.push(`New Goal: ${goal}`); // Add to long-term memory
-        this.state = "idle"; // Reset state, ready for new goal processing
-        this.microTaskProgress = 0;
-        this.currentMicroTaskName = "Goal received, pending activation.";
-        this.logAction(`New goal set: "${goal}"`, 'info'); // Log to short-term action log
-        console.log(`Agent [${this.id}] goal set: ${goal}`);
+        this.memory.push(`New Goal: ${goal}`);
+        this.clearRequestedTool();
+        this.lastError = null;
+        this.setState("idle", "Goal received, pending activation.", 0);
+        this.logAction(`New goal set: "${goal}"`, 'info');
     }
 
     /**
-     * Generates the context prompt to be sent to the LLM.
-     * Includes persona, recent memory, current goal, and instructions.
-     * @returns {string} The fully constructed prompt for the LLM.
+     * Generates the context prompt for the LLM.
+     * Includes persona, memory, goal, and instructions for tool usage and goal completion.
+     * If the agent is processing a tool result, specific instructions are added.
+     * @returns {string} The fully constructed prompt string.
      */
     getContextPrompt() {
         let context = `Persona: ${this.persona}\n\n`;
         context += "Memory (Recent Interactions/Observations):\n";
-        // Get the last 10 memory entries to provide recent context.
         const recentMemory = this.memory.slice(-10);
-        recentMemory.forEach(mem => {
-            context += `- ${mem}\n`;
-        });
+        recentMemory.forEach(mem => { context += `- ${mem}\n`; });
         context += `\nCurrent Goal: ${this.currentGoal}\n\n`;
-        context += "Based on your persona, memory, and current goal, provide your response or next action. If you believe the goal is complete, start your response with the exact phrase 'Goal Complete: '. Otherwise, continue to work towards the goal.";
+
+        if (this.state === "active_processing_tool_result" && this.memory.length > 0 && this.memory[this.memory.length-1].startsWith("Tool Result for")) {
+             context += `The last entry in your memory is the result of a tool you requested. Process this result in the context of your current goal. Based on this, decide your next step or if the goal is complete.\n\n`;
+        }
+
+        context += "To use a tool, respond with the exact format: TOOL_CALL: tool_name(param1=value1, param2=value2) ID:unique_tool_call_id_123\nThen, provide a short justification for why you need this tool call on the next line.\n";
+        context += "If you believe the goal is complete, start your response with 'Goal Complete: '. Otherwise, continue to work towards the goal or request a tool call.";
         return context;
     }
 
     /**
-     * Adds a user prompt and an agent response pair to the agent's memory.
-     * @param {string} prompt - The prompt or context that led to the response (often the goal or a summary).
-     * @param {string} response - The agent's (LLM's) response.
+     * Adds an interaction (prompt/context and LLM response) to the agent's long-term memory.
+     * @param {string} prompt - The high-level prompt or context (e.g., current goal or tool call).
+     * @param {string} response - The LLM's response or tool's result.
      */
     addInteractionToMemory(prompt, response) {
-        // Storing the high-level prompt (e.g., current goal) and the LLM's response.
-        // Avoids storing the very long getContextPrompt() repeatedly.
         this.memory.push(`Context/Prompt: ${prompt}`);
-        this.memory.push(`Response: ${response}`);
-    }
-
-    /**
-     * Updates the agent's current state.
-     * @param {('idle'|'active'|'completed_goal'|'error')} newState - The new state for the agent.
-     */
-    setState(newState) {
-        this.state = newState;
-        console.log(`Agent [${this.id}] state changed to: ${newState}`);
+        this.memory.push(`Response/Result: ${response}`); // Clarified to include 'Result' for tools
     }
 }
 
+
 /**
  * @module AgentManager
- * Manages a collection of agents, orchestrates their execution cycles,
- * and handles interaction with the Ollama LLM for agent responses.
- * Uses an IIFE to create a singleton-like module.
+ * Manages agents, their execution cycle, interaction with Ollama, and simulated tool usage.
  */
 const AgentManager = (function() {
-    let agents = {}; // Stores agent instances, keyed by agent.id
-    let agentQueue = []; // Array of agent IDs, determining the order of execution
-    let isCycleRunning = false; // Flag to prevent concurrent cycle executions
-    let ollamaModelForCycle = "llama3"; // Default Ollama model for agent turns
-    let cycleOutputElementId = ""; // DEPRECATED: ID of an old global output element, now uses #agent-activity-log-monitor
-    let cycleIntervalId = null; // Not currently used for a setTimeout-based loop, but available
-    let ollamaIsCurrentlyBusy = false; // Tracks if an Ollama request is in flight
+    let agents = {};
+    let agentQueue = [];
+    let isCycleRunning = false;
+    let ollamaModelForCycle = "llama3";
+    let cycleOutputElementId = "";
+    let cycleIntervalId = null;
+    let ollamaIsCurrentlyBusy = false;
 
-    /**
-     * Displays or logs agent activity.
-     * Primarily targets the '#agent-activity-log-monitor' <pre> tag in the UI.
-     * Also logs to the browser console.
-     * @param {Agent|null} agent - The agent performing the action, or null for system messages.
-     * @param {string} message - The message to log.
-     */
+    const toolCallRegex = /^TOOL_CALL:\s*([a-zA-Z0-9_]+)\s*\(([^)]*)\)\s*ID:([a-zA-Z0-9_.-]+)/;
+
     function _displayAgentActivity(agent, message) {
         const logEntry = agent ? `[${new Date().toLocaleTimeString()}] Agent[${agent.id}]: ${message}\n` : `[${new Date().toLocaleTimeString()}] System: ${message}\n`;
-        console.log(logEntry.trim()); // Keep console log
-
+        console.log(logEntry.trim());
         const monitorLogElement = document.getElementById('agent-activity-log-monitor');
         if (monitorLogElement) {
-          monitorLogElement.textContent += logEntry; // Use textContent for <pre> to preserve formatting
-          monitorLogElement.scrollTop = monitorLogElement.scrollHeight; // Auto-scroll
-        } else if (cycleOutputElementId) { // Fallback for older configurations
-           const outputElement = document.getElementById(cycleOutputElementId);
-           if (outputElement) {
-               outputElement.textContent += logEntry;
-               outputElement.scrollTop = outputElement.scrollHeight;
-           }
+          monitorLogElement.textContent += logEntry;
+          monitorLogElement.scrollTop = monitorLogElement.scrollHeight;
         }
       }
 
-    /**
-     * Executes a single turn for a specified agent.
-     * Fetches a response from the Ollama LLM based on the agent's context.
-     * Updates the agent's state, memory, and micro-task progress.
-     * @param {string} agentId - The ID of the agent to run a turn for.
-     * @returns {Promise<Agent|null>} The agent instance after the turn, or null if not found.
-     */
     async function runAgentTurn(agentId) {
-        if (!agents[agentId]) {
-            console.error(`Agent ${agentId} not found in runAgentTurn.`);
+        const agent = agents[agentId];
+        if (!agent) {
+            _displayAgentActivity(null, `Error: Agent ${agentId} not found during turn.`);
             return null;
         }
-        const agent = agents[agentId];
 
-        // Log start of the turn and set initial progress
-        agent.logAction(`Turn started for goal: ${agent.currentGoal}`, 'info');
-        agent.microTaskProgress = 10;
+        agent.logAction(`Turn started. Current state: ${agent.state}`, 'info');
+        // Reset progress for a new LLM turn, or if processing tool result.
+        // If it was awaiting_tool_call, provideToolResponse would have set to active_processing_tool_result and progress 10.
+        if (agent.state !== "active_processing_tool_result") {
+            agent.microTaskProgress = 10;
+        }
 
-        // If goal already completed, skip turn but update task name
-        if(agent.state === "completed_goal") {
-            _displayAgentActivity(agent, `Already completed goal: ${agent.currentGoal}`);
-            agent.microTaskProgress = 100;
-            agent.currentMicroTaskName = "Goal previously completed.";
+
+        if (agent.state === "completed_goal") {
+            _displayAgentActivity(agent, `Skipping turn: Goal "${agent.currentGoal}" already completed.`);
+            // Ensure state reflects completion accurately if it somehow wasn't set before
+            agent.setState("completed_goal", "Goal previously completed.", 100);
             agent.logAction('Skipped turn: Goal previously completed.', 'info');
             return agent;
         }
 
-        // Set agent to active and update micro-task details
-        agent.setState("active");
-        agent.currentMicroTaskName = "Generating context prompt...";
+        // Set state for LLM processing (either initial or after a tool result)
+        agent.setState("active_processing_llm", "Generating context prompt...", agent.microTaskProgress > 10 ? agent.microTaskProgress : 20);
         _displayAgentActivity(agent, `Thinking... Goal: ${agent.currentGoal}`);
 
-        // Prepare prompt for LLM
         const prompt = agent.getContextPrompt();
         agent.currentMicroTaskName = `Querying LLM (${ollamaModelForCycle})...`;
-        agent.logAction(`Preparing prompt and querying LLM (${ollamaModelForCycle})`, 'info');
+        agent.logAction(`Querying LLM (${ollamaModelForCycle}) with prompt length ${prompt.length}`, 'info');
         agent.microTaskProgress = 30;
 
         try {
-            // Make the call to Ollama
             ollamaIsCurrentlyBusy = true;
-            const ollamaResponse = await fetch('http://localhost:11434/api/generate', { // Using /api/generate for simpler non-chat model interactions
+            const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ model: ollamaModelForCycle, prompt: prompt, stream: false })
             });
             ollamaIsCurrentlyBusy = false;
-            agent.microTaskProgress = 70; // Mark progress after response received
+            agent.microTaskProgress = 70;
 
             if (!ollamaResponse.ok) {
-                const errorText = await ollamaResponse.text(); // Get error text from Ollama
-                throw new Error(`Ollama API Error: ${ollamaResponse.status} - ${errorText}`);
+                const errorText = await ollamaResponse.text();
+                agent.lastError = `Ollama API Error: ${ollamaResponse.status} - ${errorText}`;
+                agent.setState("error", `Ollama Error: ${agent.lastError.substring(0,100)}...`, 0);
+                agent.logAction(agent.lastError, 'error');
+                return agent;
             }
 
             const responseData = await ollamaResponse.json();
-            const actualResponse = responseData.response.trim(); // `response` field for /api/generate
+            const actualResponse = responseData.response ? responseData.response.trim() : "";
 
-            // Process LLM response
             agent.currentMicroTaskName = "Processing LLM response";
-            agent.logAction(`Received LLM response (${actualResponse.length} chars)`, 'info');
-            agent.addInteractionToMemory(`Goal: ${agent.currentGoal}`, actualResponse); // Add to long-term memory
-            _displayAgentActivity(agent, `Response: ${actualResponse}`);
+            agent.logAction(`LLM Raw Response: "${actualResponse.substring(0,100)}..."`, 'info');
+            _displayAgentActivity(agent, `LLM Raw Response: ${actualResponse}`);
 
-            // Check for goal completion
-            if (actualResponse.startsWith("Goal Complete:")) {
-                agent.setState("completed_goal");
-                agent.microTaskProgress = 100;
-                agent.currentMicroTaskName = "Goal Completed";
+            const toolCallMatch = actualResponse.match(toolCallRegex);
+
+            if (toolCallMatch) {
+                const toolName = toolCallMatch[1];
+                const toolParamsString = toolCallMatch[2];
+                const toolCallId = toolCallMatch[3];
+
+                agent.requestedTool = { id: toolCallId, name: toolName, params: toolParamsString, rawRequest: toolCallMatch[0] };
+                agent.setState("awaiting_tool_call", `Waiting for tool: ${toolName}(${toolParamsString})`, 80);
+                agent.logAction(`Requested tool call: ${toolName}(${toolParamsString}) ID: ${toolCallId}`, 'success');
+                _displayAgentActivity(agent, `Needs tool: ${toolName}. Parameters: ${toolParamsString}. Call ID: ${toolCallId}`);
+            } else if (actualResponse.startsWith("Goal Complete:")) {
+                agent.addInteractionToMemory(`Goal: ${agent.currentGoal}`, actualResponse);
+                agent.setState("completed_goal", "Goal Completed", 100);
                 agent.logAction(`Goal '${agent.currentGoal}' marked complete.`, 'success');
                 _displayAgentActivity(agent, `Goal marked as complete.`);
             } else {
-                agent.setState("idle"); // Set back to idle, ready for next turn if needed
-                agent.microTaskProgress = 100; // Mark micro-task as complete for this turn
-                agent.currentMicroTaskName = "Awaiting next cycle for continuation.";
-                agent.logAction('Turn finished, goal not yet complete.', 'info');
+                agent.addInteractionToMemory(`Goal: ${agent.currentGoal}`, actualResponse);
+                agent.setState("idle", "LLM response processed, awaiting next cycle.", 100);
+                agent.logAction('Turn finished with LLM response, goal not yet complete.', 'info');
             }
         } catch (error) {
-            // Handle errors during Ollama call or processing
             ollamaIsCurrentlyBusy = false;
-            console.error(`Error in runAgentTurn for ${agentId}:`, error);
+            agent.lastError = error.message;
+            agent.setState("error", `Error: ${agent.lastError.substring(0,100)}...`, 0);
+            agent.logAction(agent.lastError, 'error');
             _displayAgentActivity(agent, `Error: ${error.message}`);
-            agent.setState("error");
-            agent.microTaskProgress = 0;
-            agent.currentMicroTaskName = `Error encountered`;
-            agent.logAction(`Error: ${error.message}`, 'error');
         }
         return agent;
     }
 
-    // This internal function was part of a previous setTimeout-based loop.
-    // The current startAgentCycle uses a direct while loop with await.
-    // Retaining for potential future refactor to event-driven or setTimeout loop.
-    async function _agentCycleLoop() {
-        if (agentQueue.length === 0) {
-            isCycleRunning = false;
-            const outputElement = document.getElementById(cycleOutputElementId);
-            if (outputElement) outputElement.innerHTML += "Agent cycle finished (queue empty).\n";
-            console.log("Agent cycle finished (queue empty).");
-            if(cycleIntervalId) clearInterval(cycleIntervalId);
-            cycleIntervalId = null;
-            return;
-        }
-
-        const agentId = agentQueue.shift(); // Get agent from front of queue
-        const agent = await runAgentTurn(agentId);
-
-        if (agent && agent.state !== "completed_goal" && agent.state !== "error") {
-            agentQueue.push(agentId); // Add back to end of queue if goal not complete and no error
-        } else if (!agent) {
-            // Agent was not found or some other critical error, do not requeue
-             _displayAgentActivity({id: agentId}, `Agent ${agentId} not processed correctly, removed from queue.`);
-        }
-
-
-        // If queue is not empty, schedule next iteration
-        if (agentQueue.length > 0) {
-            // cycleIntervalId = setTimeout(_agentCycleLoop, 1000); // Continue loop with delay
-        } else {
-            isCycleRunning = false;
-            const outputElement = document.getElementById(cycleOutputElementId);
-            if (outputElement) outputElement.innerHTML += "Agent cycle finished (all agents processed or queue empty).\n";
-            console.log("Agent cycle finished (all agents processed or queue empty).");
-            if(cycleIntervalId) clearInterval(cycleIntervalId);
-            cycleIntervalId = null;
-        }
-    }
-
-
     async function startAgentCycle(modelName, outputElemId) {
         if (isCycleRunning) {
-            console.warn("Agent cycle is already running.");
-            const outputElement = document.getElementById(outputElemId || cycleOutputElementId);
-            if (outputElement) outputElement.innerHTML += "Cycle already running.\n";
+            _displayAgentActivity(null, "Agent cycle is already running.");
             return;
         }
         if (agentQueue.length === 0) {
-            console.info("Agent queue is empty. Nothing to do.");
-             const outputElement = document.getElementById(outputElemId || cycleOutputElementId);
-            if (outputElement) outputElement.innerHTML += "Agent queue is empty. Add agents with goals first.\n";
+            _displayAgentActivity(null, "Agent queue is empty. Add agents with goals first.");
             return;
         }
 
         isCycleRunning = true;
-        ollamaModelForCycle = modelName || ollamaModelForCycle; // Use provided or default
-        cycleOutputElementId = outputElemId || cycleOutputElementId; // Use provided or default
+        ollamaModelForCycle = modelName || ollamaModelForCycle;
+        _displayAgentActivity(null, `Agent cycle started with model: ${ollamaModelForCycle}...`);
 
-        const outputElement = document.getElementById(cycleOutputElementId);
-        if (outputElement) {
-             outputElement.innerHTML = ""; // Clear previous activity for this cycle
-             outputElement.innerHTML += `Agent cycle started with model: ${ollamaModelForCycle}...\n`;
-        }
-        console.log(`Agent cycle started with model: ${ollamaModelForCycle}...`);
-
-        // Using a simple loop with await for sequential processing for now
-        // A more robust implementation might use a setTimeout based loop for UI responsiveness
-        while(agentQueue.length > 0 && isCycleRunning) { // isCycleRunning can be a stop flag
+        while(agentQueue.length > 0 && isCycleRunning) {
             const agentId = agentQueue.shift();
-            const agent = await runAgentTurn(agentId);
-            if (agent && agent.state !== "completed_goal" && agent.state !== "error") {
-                agentQueue.push(agentId); // Re-queue if not done
+            const agent = agents[agentId];
+
+            if (!agent) {
+                 _displayAgentActivity(null, `Agent ${agentId} not found in queue, skipping.`);
+                 continue;
             }
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Delay for observability
-            if(agentQueue.length === 0) break; // Exit if queue becomes empty during processing
+
+            // Do NOT run an LLM turn if agent is awaiting a tool call.
+            // It will be re-added to the queue by provideToolResponse when the tool result is ready.
+            if (agent.state === "awaiting_tool_call") {
+                agentQueue.push(agentId); // Put it back at the end of the queue to check later.
+                _displayAgentActivity(agent, `Is awaiting tool call for [${agent.requestedTool.name}], deferring LLM turn.`);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Avoid busy-looping if all agents are awaiting.
+                continue;
+            }
+
+            await runAgentTurn(agentId);
+
+            // Re-queue if goal not complete, not in error, and NOT awaiting a tool call.
+            if (agent.state !== "completed_goal" && agent.state !== "error" && agent.state !== "awaiting_tool_call") {
+                agentQueue.push(agentId);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            if(agentQueue.length === 0 && isCycleRunning) {
+                _displayAgentActivity(null, "Agent queue now empty during active cycle.");
+                break;
+            }
         }
 
         isCycleRunning = false;
-        if (outputElement) outputElement.innerHTML += "Agent cycle processing finished.\n";
+        _displayAgentActivity(null, "Agent cycle processing finished (queue empty or cycle stopped).");
         console.log("Agent cycle processing finished.");
     }
 
-    function stopAgentCycle() { // Allow manual stopping
-        isCycleRunning = false;
-        if (cycleIntervalId) {
-            clearTimeout(cycleIntervalId); // Ensure this is used if setTimeout based loop is reinstated
-            cycleIntervalId = null;
+    /**
+     * Provides a response from an executed tool back to a waiting agent.
+     * @param {string} agentId - The ID of the agent that requested the tool.
+     * @param {string} toolCallId - The unique ID of the tool call this response is for.
+     * @param {string} toolResponseText - The textual result or output from the tool.
+     * @param {('success'|'error')} [toolStatus='success'] - The status of the tool execution.
+     * @returns {boolean} True if the response was successfully provided and agent re-queued, false otherwise.
+     */
+    function provideToolResponse(agentId, toolCallId, toolResponseText, toolStatus = 'success') {
+        const agent = agents[agentId];
+        if (!agent) {
+            _displayAgentActivity(null, `Error: Agent ${agentId} not found for provideToolResponse.`);
+            console.error(`AgentManager: Agent ${agentId} not found for provideToolResponse.`);
+            return false;
         }
-        // Update primary output mechanism if changed
-        const primaryLogOutput = document.getElementById('agent-activity-log-monitor') || document.getElementById(cycleOutputElementId);
-        if (primaryLogOutput) primaryLogOutput.innerHTML += "Agent cycle stopped by user.\n";
-        else console.log("Agent cycle stopped by user. (No UI output element found)");
 
-        // Reset progress for any active agents if needed
-        Object.values(agents).forEach(agent => {
-            if (agent.state === "active") {
-                agent.setState("idle");
-                agent.currentMicroTaskName = "Cycle stopped by user.";
-            }
-        });
+        // Check if the agent is actually waiting for this specific tool call
+        if (agent.state !== 'awaiting_tool_call' || !agent.requestedTool || agent.requestedTool.id !== toolCallId) {
+            const toolNameForLog = agent.requestedTool?.name || 'unknown tool'; // Use current if available, else generic
+            _displayAgentActivity(agent, `Warning: Received tool response for ID ${toolCallId} (tool: ${toolNameForLog}), but agent is not currently awaiting this specific call. Current state: ${agent.state}, Expected tool ID: ${agent.requestedTool?.id || 'none'}.`);
+            // For robustness, log the unexpected response but don't process it against the agent's current state if it's not a match.
+            agent.logAction(`Ignored mismatched/unexpected tool response (Expected ID: ${agent.requestedTool?.id || 'none'}, Got ID: ${toolCallId} for tool ${toolNameForLog})`, 'warn');
+            return false;
+        }
+
+        const toolName = agent.requestedTool.name; // Now safe to access, as we matched the ID
+        _displayAgentActivity(agent, `Received response for tool '${toolName}' (ID: ${toolCallId}). Status: ${toolStatus}.`);
+        agent.logAction(`Tool response received for '${toolName}' (ID: ${toolCallId}): Status: ${toolStatus}, Response: ${toolResponseText.substring(0,100)}...`, toolStatus);
+
+        // Add context about the tool call and its result to memory
+        agent.addInteractionToMemory(
+            `Attempted Tool Call (ID: ${toolCallId}): ${agent.requestedTool.rawRequest}`,
+            `Tool '${toolName}' Result (Status: ${toolStatus}): ${toolResponseText}`
+        );
+
+        agent.clearRequestedTool(); // Clear the pending request
+
+        if (toolStatus === 'success') {
+            // Agent needs to process this tool result with LLM
+            agent.setState("active_processing_tool_result", `Processing result from ${toolName}...`, 10);
+        } else { // Tool execution failed
+            agent.lastError = `Tool '${toolName}' failed or returned error: ${toolResponseText.substring(0,200)}...`; // Log a snippet
+            agent.setState("error", `Error after tool '${toolName}' execution.`, 0);
+            agent.logAction(agent.lastError, 'error'); // Log the specific tool error
+        }
+
+        // Re-queue the agent to process the tool's result or the error state
+        if (!agentQueue.includes(agentId)) {
+            agentQueue.push(agentId);
+            _displayAgentActivity(agent, "Re-queued to process tool response/error.");
+            console.log(`AgentManager: Agent ${agentId} re-queued after tool response.`);
+        } else {
+             _displayAgentActivity(agent, "Already in queue, will process tool response/error in next turn.");
+        }
+        // If the cycle isn't running, the user might need to restart it.
+        if (!isCycleRunning) {
+            _displayAgentActivity(null, "Agent cycle is not currently running. Start cycle to process tool response.");
+        }
+        return true;
     }
 
-
+    // Public interface
     return {
         registerAgent: (agentInstance) => {
             agents[agentInstance.id] = agentInstance;
-            console.log(`Agent [${agentInstance.id}] registered with persona: ${agentInstance.persona}`);
+            _displayAgentActivity(null, `Agent [${agentInstance.id}] registered with persona: ${agentInstance.persona}`);
         },
         setAgentGoal: (agentId, goal) => {
             const agent = agents[agentId];
             if (agent) {
-                agent.setGoal(goal); // This also sets microTaskProgress = 0 and state to idle
-                if (!agentQueue.includes(agentId) && (agent.state === "idle" || agent.state === "completed_goal" || agent.state === "error")) {
+                agent.setGoal(goal);
+                if (!agentQueue.includes(agentId) &&
+                    (agent.state === "idle" || agent.state === "completed_goal" || agent.state === "error")) {
                     agentQueue.push(agentId);
-                    console.log(`Agent [${agentId}] added to queue.`);
+                    _displayAgentActivity(agent, `Added to processing queue for new goal.`);
                 } else if (agentQueue.includes(agentId)) {
-                     console.log(`Agent [${agentId}] is already in the queue.`);
-                } else { // Agent is active but goal is being updated
-                    console.log(`Agent [${agentId}] is currently active, goal updated. It will continue its current turn and then address the new goal if re-queued.`);
+                     _displayAgentActivity(agent, `Already in queue. Goal updated.`);
+                } else {
+                    _displayAgentActivity(agent, `Currently active. Goal updated; will address after current turn if re-queued.`);
                 }
             } else {
-                console.error(`Agent [${agentId}] not found. Cannot set goal.`);
+                _displayAgentActivity(null, `Error: Agent [${agentId}] not found. Cannot set goal.`);
             }
         },
         startAgentCycle,
-        stopAgentCycle,
+        stopAgentCycle: () => {
+            if (!isCycleRunning) {
+                _displayAgentActivity(null, "Agent cycle is not currently running.");
+                return;
+            }
+            isCycleRunning = false;
+            if (cycleIntervalId) { clearTimeout(cycleIntervalId); cycleIntervalId = null; }
+            _displayAgentActivity(null, "Agent cycle stop requested by user. Finishing current turn...");
+            Object.values(agents).forEach(agent => {
+                if (agent.state === "active" || agent.state === "active_processing_llm" || agent.state === "active_processing_tool_result") {
+                    agent.setState("idle", "Cycle stopped by user.", agent.microTaskProgress);
+                    agent.logAction("Cycle stopped by user during turn.", "warn");
+                }
+            });
+        },
         getAgentById: (id) => agents[id],
-        getAllAgents: () => Object.values(agents), // Return array of agent objects
+        getAllAgents: () => Object.values(agents),
         getAgentQueue: () => [...agentQueue],
-        isOllamaBusy: () => ollamaIsCurrentlyBusy // Expose Ollama busy status
+        isOllamaBusy: () => ollamaIsCurrentlyBusy,
+        getActiveToolRequest, // New
+        provideToolResponse   // New
     };
 })();
