@@ -105,3 +105,58 @@ The packaged application(s) will be found in the `dist_electron/` directory (as 
     *   The AI assistant may ask you to provide these keys/tokens during conversation. You might be able to paste them into the old API test input fields on the UI if the AI refers to them, or directly in chat if the AI is designed to temporarily use them from there. This is a temporary measure.
 *   **AppImageLauncher / GearLever Compatibility**:
     The `linux.category` in `package.json` has been set to `"Development"`. This should help tools like AppImageLauncher or GearLever correctly categorize the application. Standard AppImages produced by `electron-builder` are generally compatible.
+
+## 6. Building for macOS (Intel x64)
+
+To create a `.dmg` (disk image) and a zipped `.app` bundle for Intel-based macOS systems:
+
+### Prerequisites for macOS Build:
+
+1.  **macOS Environment**: You need to build on a macOS machine.
+2.  **Node.js and npm/yarn**: Same as for Linux.
+3.  **Xcode Command Line Tools**: While not strictly required for unsigned builds, they are often needed for native module compilation and are essential for code signing. Install via:
+    ```bash
+    xcode-select --install
+    ```
+4.  **Application Icon (`.icns`)**:
+    *   `electron-builder` is configured to look for an icon at `build/icon.icns`.
+    *   Create this file. A common way is to start with a high-resolution PNG (e.g., 1024x1024) and use macOS's `iconutil` command-line tool or an online converter to create the `.icns` file.
+    *   Example (if you have a folder `my_icon.iconset` containing appropriately sized PNGs):
+        ```bash
+        # mkdir -p build
+        # iconutil -c icns build/my_icon.iconset -o build/icon.icns
+        # (Ensure build/my_icon.iconset contains icon_512x512.png, icon_256x256.png etc.)
+        # Or, use an online PNG to ICNS converter and place the result in build/icon.icns
+        ```
+        For a placeholder: `mkdir -p build && touch build/icon.icns`
+
+### Build Command for macOS:
+
+Ensure you have run `npm install` (or `yarn install`) in the project root on your macOS machine. Then, from the project's root directory:
+
+```bash
+npm run build
+```
+or
+```bash
+yarn build
+```
+`electron-builder` will detect it's on macOS and build the targets specified in `package.json` (dmg and zip for x64).
+
+### Output:
+
+The packaged application(s) will be found in the `dist_electron/` directory. You should find files like:
+*   `SKYSCOPE AI-0.1.0.dmg`
+*   `skyscope-ai-mac-0.1.0-x64.zip` (or similar, containing the .app)
+
+### Running the Application on macOS:
+1.  Open the `.dmg` file and drag `SKYSCOPE AI.app` to your Applications folder.
+2.  Alternatively, unzip the `.zip` file and run the `.app`.
+3.  Remember to also run the `copilotkit_backend` service separately, and ensure Ollama is running with the necessary models.
+
+### Code Signing and Notarization (Advanced):
+For distributing the macOS app more widely (e.g., outside direct downloads from people who trust you), you'll likely encounter issues with macOS Gatekeeper if the app is not signed and notarized with an Apple Developer ID. This is an advanced process:
+*   You would need an Apple Developer account.
+*   Configure `electron-builder` with your Apple ID and signing certificates.
+*   After building a signed app, it needs to be submitted to Apple for notarization.
+This is beyond the scope of basic building but important for broader, smoother distribution on macOS. Unsigned apps will require users to manually bypass Gatekeeper warnings (e.g., by right-clicking and choosing "Open").

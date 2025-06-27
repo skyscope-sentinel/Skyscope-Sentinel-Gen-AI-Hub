@@ -59,9 +59,24 @@
       "icon": "build/icon.ico"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "build/icon.icns",
-      "category": "public.app-category.developer-tools"
+      "target": [
+        {
+          "target": "dmg", // Standard distributable disk image
+          "arch": ["x64"]  // Specify Intel (x64) architecture
+        },
+        {
+          "target": "zip", // To also get a zipped .app bundle
+          "arch": ["x64"]
+        }
+      ],
+        "icon": "build/icon.icns", // macOS icon file
+        "category": "public.app-category.developer-tools", // App category for Finder
+        "minimumSystemVersion": "10.12.0", // Example: macOS Sierra or later
+        // "bundleVersion": "0.1.0", // Can be set, often derived from package.json version
+        // "darkModeSupport": true, // Electron usually handles this well based on OS
+        "asarUnpack": [ // If any native modules need to be unpacked from asar
+          // "./node_modules/some-native-module/**"
+        ]
     },
     "asar": true
   }
